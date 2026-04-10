@@ -19,6 +19,17 @@ Enterprise-grade auth middleware for Cloudflare Functions. Stateless JWT verific
 npm install @rareminds-eym/auth-core
 ```
 
+### Registry Setup
+
+This package is published to GitHub Packages. Create a `.npmrc` in your project root:
+
+```
+@rareminds-eym:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+Set `NODE_AUTH_TOKEN` to a GitHub PAT with `read:packages` scope.
+
 ## Quick Start
 
 ### 1. Initialize (once at startup)
@@ -77,7 +88,7 @@ Request arrives
     │   ├─ Has refresh_token cookie?
     │   │   ├─ validateSession (optional) → ❌ 401 "Session expired"
     │   │   ├─ refreshAccessToken         → ❌ 502 "Refresh failed"
-    │   │   └─ verifyJWT(new token)       → ✅ Run handler + new Authorization header
+    │   │   └─ verifyJWT(new token)       → ✅ Run handler + X-Access-Token header
     │   └─ No refresh token → ❌ 401 "Unauthorized"
     │
     └─ SSO unreachable → ❌ 502
@@ -217,9 +228,12 @@ You can also register your own cleanup callbacks:
 ```ts
 import { onConfigReset } from "@rareminds-eym/auth-core";
 
-onConfigReset(() => {
+const unsubscribe = onConfigReset(() => {
   // Clear your own caches when initAuth is called again
 });
+
+// Later, if you no longer need the callback:
+unsubscribe();
 ```
 
 ## Standalone Utilities
@@ -342,6 +356,7 @@ All error responses are JSON:
 
 | Status | Error | When |
 |--------|-------|------|
+| `401` | `Invalid token` | JWT is tampered, wrong issuer/audience, or malformed |
 | `401` | `Unauthorized: no valid token or refresh token` | No JWT and no refresh cookie |
 | `401` | `Session expired or revoked` | Session validation failed |
 | `403` | `Inactive membership` | User membership is not active |

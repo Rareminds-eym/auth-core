@@ -14,7 +14,16 @@ export interface AuthCoreConfig {
   validateSessionBeforeRefresh?: boolean;
 }
 
-let _config: AuthCoreConfig | null = null;
+/**
+ * Internal resolved config where defaults have been applied.
+ * Guarantees ssoTimeoutMs and validateSessionBeforeRefresh are set.
+ */
+export interface ResolvedAuthCoreConfig extends AuthCoreConfig {
+  ssoTimeoutMs: number;
+  validateSessionBeforeRefresh: boolean;
+}
+
+let _config: ResolvedAuthCoreConfig | null = null;
 let _onReset: (() => void)[] = [];
 
 /**
@@ -35,16 +44,37 @@ export function onConfigReset(fn: () => void): () => void {
  * Safe to call again — clears all internal caches (JWKS, etc).
  */
 export function initAuth(config: AuthCoreConfig): void {
+  if (!config.ssoDomain || typeof config.ssoDomain !== "string") {
+    throw new Error("ssoDomain is required and must be a non-empty string");
+  }
+
+  // Validate it's a parseable URL
+  try {
+    new URL(config.ssoDomain);
+  } catch {
+    throw new Error(`ssoDomain is not a valid URL: ${config.ssoDomain}`);
+  }
+
   const timeout = config.ssoTimeoutMs ?? 5000;
   if (timeout <= 0) {
     throw new Error("ssoTimeoutMs must be a positive number");
   }
-  _config = { validateSessionBeforeRefresh: true, ...config, ssoTimeoutMs: timeout };
+
+  // Normalize: strip trailing slash to avoid double-slash in constructed URLs
+  const ssoDomain = config.ssoDomain.replace(/\/+$/, "");
+
+  _config = {
+    ...config,
+    ssoDomain,
+    ssoTimeoutMs: timeout,
+    validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? true,
+  };
+
   // Flush all cached state that depends on config
   for (const fn of _onReset) fn();
 }
 
-export function getConfig(): AuthCoreConfig {
+export function getConfig(): ResolvedAuthCoreConfig {
   if (!_config) {
     throw new Error(
       "auth-core not initialized. Call initAuth({ ssoDomain: '...' }) before using any middleware."

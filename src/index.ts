@@ -1,5 +1,5 @@
 export { initAuth, getConfig, onConfigReset } from "./config";
-export type { AuthCoreConfig } from "./config";
+export type { AuthCoreConfig, ResolvedAuthCoreConfig } from "./config";
 
 export { verifyJWT } from "./jwt/verifyJWT";
 

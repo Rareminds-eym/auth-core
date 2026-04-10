@@ -1,3 +1,4 @@
+import { errors } from "jose";
 import { verifyJWT } from "../jwt/verifyJWT";
 import { extractToken } from "../utils/extractToken";
 import { getRefreshToken } from "../utils/getRefreshToken";
@@ -5,10 +6,10 @@ import { jsonError } from "../utils/jsonError";
 import { refreshAccessToken } from "../session/refreshAccessToken";
 import { validateSession } from "../session/validateSession";
 import { getConfig } from "../config";
-import type { ContextWithUser } from "../types/auth";
+import type { ContextWithUser, AuthenticatedContext } from "../types/auth";
 
 export function withAuth(
-  handler: (context: ContextWithUser) => Promise<Response> | Response
+  handler: (context: AuthenticatedContext) => Promise<Response> | Response
 ) {
   return async (context: ContextWithUser): Promise<Response> => {
     const token = extractToken(context.request);
@@ -23,9 +24,13 @@ export function withAuth(
         }
 
         context.data.user = user;
-        return handler(context);
-      } catch {
-        // Token is present but invalid/expired — fall through to refresh
+        return handler(context as AuthenticatedContext);
+      } catch (err) {
+        // Only fall through to refresh if the token is expired.
+        // Tampered, wrong issuer/audience, or otherwise invalid tokens → 401 immediately.
+        if (!(err instanceof errors.JWTExpired)) {
+          return jsonError("Invalid token", 401);
+        }
       }
     }
 
@@ -70,7 +75,7 @@ export function withAuth(
     }
 
     // 6. Run handler and attach new token to response (safe for immutable responses)
-    const response = await handler(context);
+    const response = await handler(context as AuthenticatedContext);
     const newHeaders = new Headers(response.headers);
     newHeaders.set("X-Access-Token", access_token);
 

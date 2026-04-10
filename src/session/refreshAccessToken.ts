@@ -16,11 +16,20 @@ export async function refreshAccessToken(
     throw new Error(`Refresh failed: ${res.status}`);
   }
 
-  const body = await res.json();
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error("Invalid JSON in refresh response from SSO");
+  }
 
-  if (!body || typeof body.access_token !== "string") {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    typeof (body as Record<string, unknown>).access_token !== "string"
+  ) {
     throw new Error("Invalid refresh response from SSO");
   }
 
-  return { access_token: body.access_token };
+  return { access_token: (body as Record<string, unknown>).access_token as string };
 }

@@ -15,9 +15,14 @@ export async function validateSession(
 
   if (!res.ok) return { valid: false };
 
-  const body = await res.json();
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return { valid: false };
+  }
 
-  if (!body || typeof body.valid !== "boolean") {
+  if (!body || typeof body !== "object" || typeof (body as Record<string, unknown>).valid !== "boolean") {
     return { valid: false };
   }
 

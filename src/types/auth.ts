@@ -28,3 +28,15 @@ export interface ContextWithUser<Env = Record<string, unknown>> {
   waitUntil: (promise: Promise<unknown>) => void;
   passThroughOnException: () => void;
 }
+
+/**
+ * Context type where `user` is guaranteed to exist.
+ * Use this in handlers wrapped by `withAuth`.
+ */
+export interface AuthenticatedContext<Env = Record<string, unknown>>
+  extends ContextWithUser<Env> {
+  data: {
+    user: AuthUser;
+    [key: string]: unknown;
+  };
+}

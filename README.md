@@ -51,14 +51,18 @@ initAuth({
   ssoDomain: "https://sso.rareminds.com",   // Required — your SSO base URL
   ssoTimeoutMs: 3000,                        // Optional — fetch timeout (default: 5000ms)
   validateSessionBeforeRefresh: false,        // Optional — skip /validate-session call (default: true)
+  issuer: "https://sso.rareminds.com",       // Optional — JWT issuer validation
+  audience: "rareminds-api",                 // Optional — JWT audience validation
 });
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `ssoDomain` | `string` | — | Base URL of your SSO service |
-| `ssoTimeoutMs` | `number` | `5000` | Timeout in ms for all SSO fetch calls |
+| `ssoTimeoutMs` | `number` | `5000` | Timeout in ms for all SSO fetch calls (must be > 0) |
 | `validateSessionBeforeRefresh` | `boolean` | `true` | Whether to call `/auth/validate-session` before `/auth/refresh`. Set to `false` if your refresh endpoint already rejects revoked sessions. |
+| `issuer` | `string` | — | Expected JWT `iss` claim. Recommended for multi-service setups. |
+| `audience` | `string` | — | Expected JWT `aud` claim. Recommended for multi-service setups. |
 
 Safe to call `initAuth()` again — it clears all internal caches (JWKS, etc).
 
@@ -79,7 +83,7 @@ Request arrives
     └─ SSO unreachable → ❌ 502
 ```
 
-When a token is refreshed, the new JWT is attached to the response via the `Authorization` header so the client can update its stored token.
+When a token is refreshed, the new JWT is attached to the response via the `X-Access-Token` header so the client can update its stored token.
 
 ## Middleware
 
@@ -174,20 +178,20 @@ Logs:
 
 ## Typed Context
 
-`ContextWithUser` is generic — pass your Cloudflare env bindings:
+`ContextWithUser` is generic — pass your Cloudflare env bindings. After `withAuth`, use `AuthenticatedContext` where `user` is guaranteed:
 
 ```ts
 import { withAuth } from "@rareminds-eym/auth-core";
-import type { ContextWithUser } from "@rareminds-eym/auth-core";
+import type { AuthenticatedContext } from "@rareminds-eym/auth-core";
 
 interface MyEnv {
   DB: D1Database;
   KV_STORE: KVNamespace;
 }
 
-export const onRequestGet = withAuth(async (context: ContextWithUser<MyEnv>) => {
+export const onRequestGet = withAuth(async (context: AuthenticatedContext<MyEnv>) => {
   const db = context.env.DB;
-  const user = context.data.user!;
+  const user = context.data.user; // AuthUser — no ! needed
   return Response.json({ ok: true });
 });
 ```
@@ -230,6 +234,7 @@ import {
   validateSession,      // POST /auth/validate-session
   refreshAccessToken,   // POST /auth/refresh
   fetchWithTimeout,     // Fetch with configurable AbortController timeout
+  jsonError,            // Shared JSON error response helper
   getConfig,            // Read current config
   onConfigReset,        // Register cache-clearing callbacks
   initAuth,             // Initialize / re-initialize config
@@ -273,6 +278,7 @@ import type {
   AuthUser,                   // { sub, org_id, roles, products, membership_status }
   MembershipStatus,           // "active" | "inactive" | "suspended" | "expired"
   ContextWithUser,            // Generic Cloudflare-style context
+  AuthenticatedContext,       // Context where user is guaranteed (after withAuth)
   SessionValidationResponse,  // { valid: boolean, user?: AuthUser }
   AuthCoreConfig,             // initAuth() config shape
 } from "@rareminds-eym/auth-core";
@@ -366,7 +372,8 @@ auth-core/
 │   ├── utils/
 │   │   ├── extractToken.ts        # Bearer token extraction from Authorization header
 │   │   ├── getRefreshToken.ts     # Refresh token extraction from Cookie header
-│   │   └── fetchWithTimeout.ts    # Fetch wrapper with AbortController timeout
+│   │   ├── fetchWithTimeout.ts    # Fetch wrapper with AbortController timeout
+│   │   └── jsonError.ts           # Shared JSON error response helper
 │   ├── session/
 │   │   ├── refreshAccessToken.ts  # POST /auth/refresh
 │   │   └── validateSession.ts     # POST /auth/validate-session

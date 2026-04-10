@@ -23,7 +23,8 @@
     "url": "https://github.com/Rareminds-eym/auth-core.git"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "jose": "^5.0.0"

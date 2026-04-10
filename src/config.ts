@@ -1,5 +1,9 @@
 export interface AuthCoreConfig {
   ssoDomain: string;
+  /** Expected JWT issuer claim. Recommended for multi-service setups. */
+  issuer?: string;
+  /** Expected JWT audience claim. Recommended for multi-service setups. */
+  audience?: string;
   /** Timeout in ms for SSO fetch calls. Default: 5000 */
   ssoTimeoutMs?: number;
   /**
@@ -16,9 +20,13 @@ let _onReset: (() => void)[] = [];
 /**
  * Register a callback to run when initAuth resets config.
  * Used internally to clear caches (e.g. JWKS) on re-init.
+ * Returns an unsubscribe function.
  */
-export function onConfigReset(fn: () => void): void {
+export function onConfigReset(fn: () => void): () => void {
   _onReset.push(fn);
+  return () => {
+    _onReset = _onReset.filter((f) => f !== fn);
+  };
 }
 
 /**
@@ -27,7 +35,11 @@ export function onConfigReset(fn: () => void): void {
  * Safe to call again — clears all internal caches (JWKS, etc).
  */
 export function initAuth(config: AuthCoreConfig): void {
-  _config = { ssoTimeoutMs: 5000, validateSessionBeforeRefresh: true, ...config };
+  const timeout = config.ssoTimeoutMs ?? 5000;
+  if (timeout <= 0) {
+    throw new Error("ssoTimeoutMs must be a positive number");
+  }
+  _config = { validateSessionBeforeRefresh: true, ...config, ssoTimeoutMs: timeout };
   // Flush all cached state that depends on config
   for (const fn of _onReset) fn();
 }

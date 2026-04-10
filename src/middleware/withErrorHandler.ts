@@ -9,20 +9,21 @@ export function withErrorHandler(
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       const url = context.request?.url ?? "unknown";
+      const timestamp = new Date().toISOString();
 
       console.error(
         JSON.stringify({
           level: "error",
           message,
           url,
-          timestamp: new Date().toISOString(),
+          timestamp,
         })
       );
 
       return new Response(
         JSON.stringify({
           error: "Internal Server Error",
-          timestamp: new Date().toISOString(),
+          timestamp,
         }),
         {
           status: 500,

@@ -10,8 +10,13 @@ export function getRefreshToken(request: Request): string | null {
   for (const pair of pairs) {
     const [name, ...rest] = pair.split("=");
     if (name.trim() === "refresh_token") {
-      const value = rest.join("=").trim(); // rejoin in case value contains '='
-      return value ? decodeURIComponent(value) : null;
+      const raw = rest.join("=").trim(); // rejoin in case value contains '='
+      if (!raw) return null;
+      try {
+        return decodeURIComponent(raw);
+      } catch {
+        return null;
+      }
     }
   }
 

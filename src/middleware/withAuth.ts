@@ -1,17 +1,11 @@
 import { verifyJWT } from "../jwt/verifyJWT";
 import { extractToken } from "../utils/extractToken";
 import { getRefreshToken } from "../utils/getRefreshToken";
+import { jsonError } from "../utils/jsonError";
 import { refreshAccessToken } from "../session/refreshAccessToken";
 import { validateSession } from "../session/validateSession";
 import { getConfig } from "../config";
 import type { ContextWithUser } from "../types/auth";
-
-function jsonError(message: string, status: number): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 export function withAuth(
   handler: (context: ContextWithUser) => Promise<Response> | Response
@@ -78,7 +72,7 @@ export function withAuth(
     // 6. Run handler and attach new token to response (safe for immutable responses)
     const response = await handler(context);
     const newHeaders = new Headers(response.headers);
-    newHeaders.set("Authorization", `Bearer ${access_token}`);
+    newHeaders.set("X-Access-Token", access_token);
 
     return new Response(response.body, {
       status: response.status,

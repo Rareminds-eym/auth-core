@@ -11,6 +11,7 @@ export { withErrorHandler } from "./middleware/withErrorHandler";
 export { getRefreshToken } from "./utils/getRefreshToken";
 export { extractToken } from "./utils/extractToken";
 export { fetchWithTimeout } from "./utils/fetchWithTimeout";
+export { jsonError } from "./utils/jsonError";
 
 export { refreshAccessToken } from "./session/refreshAccessToken";
 export { validateSession } from "./session/validateSession";
@@ -19,5 +20,6 @@ export type {
   AuthUser,
   MembershipStatus,
   ContextWithUser,
+  AuthenticatedContext,
   SessionValidationResponse,
 } from "./types/auth";

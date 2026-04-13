@@ -1,6 +1,6 @@
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { AuthUser, MembershipStatus } from "../types/auth";
-import { getConfig, onConfigReset } from "../config";
+import type { AuthUser, MembershipStatus } from "../types/auth.js";
+import { getConfig, onConfigReset } from "../config.js";
 
 let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 

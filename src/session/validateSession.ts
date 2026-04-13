@@ -1,6 +1,6 @@
-import type { SessionValidationResponse } from "../types/auth";
-import { getConfig } from "../config";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import type { SessionValidationResponse } from "../types/auth.js";
+import { getConfig } from "../config.js";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout.js";
 
 /**
  * Validates the current session by calling GET /auth/me on the SSO worker.

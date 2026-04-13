@@ -1,21 +1,21 @@
-export { initAuth, getConfig, onConfigReset } from "./config";
-export type { AuthCoreConfig, ResolvedAuthCoreConfig } from "./config";
+export { initAuth, getConfig, onConfigReset } from "./config.js";
+export type { AuthCoreConfig, ResolvedAuthCoreConfig } from "./config.js";
 
-export { verifyJWT } from "./jwt/verifyJWT";
+export { verifyJWT } from "./jwt/verifyJWT.js";
 
-export { withAuth } from "./middleware/withAuth";
-export { requireRole } from "./middleware/requireRole";
-export { requireProduct } from "./middleware/requireProduct";
-export { withErrorHandler } from "./middleware/withErrorHandler";
+export { withAuth } from "./middleware/withAuth.js";
+export { requireRole } from "./middleware/requireRole.js";
+export { requireProduct } from "./middleware/requireProduct.js";
+export { withErrorHandler } from "./middleware/withErrorHandler.js";
 
-export { getRefreshToken } from "./utils/getRefreshToken";
-export { extractToken } from "./utils/extractToken";
-export { fetchWithTimeout } from "./utils/fetchWithTimeout";
-export { jsonError } from "./utils/jsonError";
+export { getRefreshToken } from "./utils/getRefreshToken.js";
+export { extractToken } from "./utils/extractToken.js";
+export { fetchWithTimeout } from "./utils/fetchWithTimeout.js";
+export { jsonError } from "./utils/jsonError.js";
 
-export { refreshAccessToken } from "./session/refreshAccessToken";
-export { validateSession } from "./session/validateSession";
-export { logout } from "./session/logout";
+export { refreshAccessToken } from "./session/refreshAccessToken.js";
+export { validateSession } from "./session/validateSession.js";
+export { logout } from "./session/logout.js";
 
 export type {
   AuthUser,
@@ -23,4 +23,4 @@ export type {
   ContextWithUser,
   AuthenticatedContext,
   SessionValidationResponse,
-} from "./types/auth";
+} from "./types/auth.js";

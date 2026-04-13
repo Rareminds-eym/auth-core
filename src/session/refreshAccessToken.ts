@@ -1,5 +1,5 @@
-import { getConfig } from "../config";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { getConfig } from "../config.js";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout.js";
 
 export async function refreshAccessToken(
   refreshToken: string

@@ -1,4 +1,4 @@
-import type { ContextWithUser } from "../types/auth";
+import type { ContextWithUser } from "../types/auth.js";
 
 export function withErrorHandler(
   handler: (context: ContextWithUser) => Promise<Response> | Response

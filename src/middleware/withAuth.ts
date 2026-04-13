@@ -1,10 +1,10 @@
 import { errors } from "jose";
-import { verifyJWT } from "../jwt/verifyJWT";
-import { extractToken } from "../utils/extractToken";
-import { getRefreshToken } from "../utils/getRefreshToken";
-import { jsonError } from "../utils/jsonError";
-import { refreshAccessToken } from "../session/refreshAccessToken";
-import type { ContextWithUser, AuthenticatedContext } from "../types/auth";
+import { verifyJWT } from "../jwt/verifyJWT.js";
+import { extractToken } from "../utils/extractToken.js";
+import { getRefreshToken } from "../utils/getRefreshToken.js";
+import { jsonError } from "../utils/jsonError.js";
+import { refreshAccessToken } from "../session/refreshAccessToken.js";
+import type { ContextWithUser, AuthenticatedContext } from "../types/auth.js";
 
 export function withAuth(
   handler: (context: AuthenticatedContext) => Promise<Response> | Response

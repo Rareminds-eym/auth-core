@@ -1,5 +1,5 @@
-import { getConfig } from "../config";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { getConfig } from "../config.js";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout.js";
 
 /**
  * Revoke the current session by calling POST /auth/logout on the SSO worker.

@@ -1,5 +1,5 @@
-import type { ContextWithUser } from "../types/auth";
-import { jsonError } from "../utils/jsonError";
+import type { ContextWithUser } from "../types/auth.js";
+import { jsonError } from "../utils/jsonError.js";
 
 /**
  * Requires the authenticated user to have at least one of the specified roles.

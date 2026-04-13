@@ -1,4 +1,4 @@
-import { getConfig } from "../config";
+import { getConfig } from "../config.js";
 
 /**
  * Fetch wrapper with configurable timeout via AbortController.

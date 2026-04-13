@@ -35,10 +35,13 @@ const VALID_MEMBERSHIP_STATUSES: Set<string> = new Set([
  * with correct types, including array element validation.
  */
 function assertAuthUser(payload: Record<string, unknown>): AuthUser {
-  const { sub, org_id, roles, products, membership_status } = payload;
+  const { sub, email, org_id, roles, products, membership_status, is_email_verified } = payload;
 
   if (typeof sub !== "string") {
     throw new Error("JWT missing required claim: sub");
+  }
+  if (typeof email !== "string") {
+    throw new Error("JWT missing required claim: email");
   }
   if (typeof org_id !== "string") {
     throw new Error("JWT missing required claim: org_id");
@@ -57,23 +60,27 @@ function assertAuthUser(payload: Record<string, unknown>): AuthUser {
       "JWT claim 'membership_status' must be one of: active, inactive, suspended, expired"
     );
   }
+  if (typeof is_email_verified !== "boolean") {
+    throw new Error("JWT claim 'is_email_verified' must be a boolean");
+  }
 
   return {
     sub,
+    email,
     org_id,
     roles,
     products,
     membership_status: membership_status as MembershipStatus,
+    is_email_verified,
   };
 }
 
 export async function verifyJWT(token: string): Promise<AuthUser> {
   const config = getConfig();
 
-  const verifyOptions: { issuer?: string; audience?: string } = {};
-  if (config.issuer) verifyOptions.issuer = config.issuer;
-  if (config.audience) verifyOptions.audience = config.audience;
-
-  const { payload } = await jwtVerify(token, getJWKS(), verifyOptions);
+  const { payload } = await jwtVerify(token, getJWKS(), {
+    issuer: config.issuer,
+    audience: config.audience,
+  });
   return assertAuthUser(payload as Record<string, unknown>);
 }

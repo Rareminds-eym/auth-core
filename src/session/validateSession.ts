@@ -2,15 +2,24 @@ import type { SessionValidationResponse } from "../types/auth";
 import { getConfig } from "../config";
 import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
+/**
+ * Validates the current session by calling GET /auth/me on the SSO worker.
+ * Requires a valid access token (passed as Bearer header).
+ *
+ * Note: validateSessionBeforeRefresh defaults to false because the
+ * refresh endpoint already rejects revoked/expired sessions.
+ * This function is available for explicit session checks if needed.
+ */
 export async function validateSession(
-  refreshToken: string
+  accessToken: string
 ): Promise<SessionValidationResponse> {
   const { ssoDomain } = getConfig();
 
-  const res = await fetchWithTimeout(`${ssoDomain}/auth/validate-session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+  const res = await fetchWithTimeout(`${ssoDomain}/auth/me`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   if (!res.ok) return { valid: false };
@@ -22,9 +31,13 @@ export async function validateSession(
     return { valid: false };
   }
 
-  if (!body || typeof body !== "object" || typeof (body as Record<string, unknown>).valid !== "boolean") {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    typeof (body as Record<string, unknown>).sub !== "string"
+  ) {
     return { valid: false };
   }
 
-  return body as SessionValidationResponse;
+  return { valid: true, user: body as SessionValidationResponse["user"] };
 }

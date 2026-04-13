@@ -15,6 +15,7 @@ export { jsonError } from "./utils/jsonError";
 
 export { refreshAccessToken } from "./session/refreshAccessToken";
 export { validateSession } from "./session/validateSession";
+export { logout } from "./session/logout";
 
 export type {
   AuthUser,

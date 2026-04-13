@@ -2,10 +2,12 @@ export type MembershipStatus = "active" | "inactive" | "suspended" | "expired";
 
 export interface AuthUser {
   sub: string;
+  email: string;
   org_id: string;
   roles: string[];
   products: string[];
   membership_status: MembershipStatus;
+  is_email_verified: boolean;
 }
 
 export interface SessionValidationResponse {

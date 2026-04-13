@@ -3,7 +3,7 @@ import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 export async function refreshAccessToken(
   refreshToken: string
-): Promise<{ access_token: string }> {
+): Promise<{ access_token: string; setCookieHeaders: string[] }> {
   const { ssoDomain } = getConfig();
 
   const res = await fetchWithTimeout(`${ssoDomain}/auth/refresh`, {
@@ -15,6 +15,15 @@ export async function refreshAccessToken(
   if (!res.ok) {
     throw new Error(`Refresh failed: ${res.status}`);
   }
+
+  // Capture Set-Cookie headers so callers can forward them to the browser.
+  // The worker sends rotated access_token + refresh_token cookies.
+  const setCookieHeaders: string[] = [];
+  res.headers.forEach((value, key) => {
+    if (key.toLowerCase() === "set-cookie") {
+      setCookieHeaders.push(value);
+    }
+  });
 
   let body: unknown;
   try {
@@ -31,5 +40,8 @@ export async function refreshAccessToken(
     throw new Error("Invalid refresh response from SSO");
   }
 
-  return { access_token: (body as Record<string, unknown>).access_token as string };
+  return {
+    access_token: (body as Record<string, unknown>).access_token as string,
+    setCookieHeaders,
+  };
 }

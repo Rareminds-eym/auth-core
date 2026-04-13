@@ -1,25 +1,40 @@
 export interface AuthCoreConfig {
   ssoDomain: string;
-  /** Expected JWT issuer claim. Recommended for multi-service setups. */
+  /**
+   * Expected JWT issuer claim.
+   * Default: "sso-api" (matches the SSO worker).
+   */
   issuer?: string;
-  /** Expected JWT audience claim. Recommended for multi-service setups. */
+  /**
+   * Expected JWT audience claim.
+   * Default: "sso-client" (matches the SSO worker).
+   */
   audience?: string;
   /** Timeout in ms for SSO fetch calls. Default: 5000 */
   ssoTimeoutMs?: number;
   /**
-   * Whether to call /auth/validate-session before /auth/refresh.
-   * Set to false if your /auth/refresh endpoint already rejects revoked sessions.
-   * Default: true
+   * Whether to validate the session before refreshing.
+   * When true, calls GET /auth/me before /auth/refresh.
+   * Set to false (recommended) since /auth/refresh already rejects revoked sessions.
+   * Default: false
    */
   validateSessionBeforeRefresh?: boolean;
 }
 
+/** Default JWT issuer — matches the SSO worker's signing config */
+const DEFAULT_ISSUER = "sso-api";
+
+/** Default JWT audience — matches the SSO worker's signing config */
+const DEFAULT_AUDIENCE = "sso-client";
+
 /**
  * Internal resolved config where defaults have been applied.
- * Guarantees ssoTimeoutMs and validateSessionBeforeRefresh are set.
+ * Guarantees ssoTimeoutMs, issuer, audience, and validateSessionBeforeRefresh are set.
  */
 export interface ResolvedAuthCoreConfig extends AuthCoreConfig {
   ssoTimeoutMs: number;
+  issuer: string;
+  audience: string;
   validateSessionBeforeRefresh: boolean;
 }
 
@@ -67,7 +82,9 @@ export function initAuth(config: AuthCoreConfig): void {
     ...config,
     ssoDomain,
     ssoTimeoutMs: timeout,
-    validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? true,
+    issuer: config.issuer ?? DEFAULT_ISSUER,
+    audience: config.audience ?? DEFAULT_AUDIENCE,
+    validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? false,
   };
 
   // Flush all cached state that depends on config

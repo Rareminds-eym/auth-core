@@ -33,6 +33,6 @@
     "registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
-    "typescript": "^6.0.2"
+    "typescript": "^5.7.0"
   }
 }

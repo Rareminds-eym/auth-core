@@ -1,141 +1,100 @@
 # @rareminds-eym/auth-core
 
-Enterprise-grade auth middleware for Cloudflare Functions. Stateless JWT verification at the edge with centralized session control and secure refresh token flow.
+Server-side auth middleware for Cloudflare Functions. Stateless JWT verification at the edge via JWKS, automatic refresh token flow, role and product guards — purpose-built for the SSO worker.
 
-## Features
-
-- **Edge-compatible** — runs on Cloudflare Functions, no Node.js APIs required
-- **Stateless JWT verification** via JWKS
-- **Automatic refresh token flow** — transparent token renewal from HTTP-only cookies
-- **Session validation** — optional SSO round-trip to check session revocation
-- **Role & product guards** — composable middleware for authorization
-- **Runtime configuration** — no hardcoded domains, works across environments
-- **Timeout protection** — all SSO calls use configurable `AbortController` timeouts
-- **Type-safe** — full TypeScript with generic Cloudflare context support
-
-## Installation
+## Install
 
 ```bash
 npm install @rareminds-eym/auth-core
 ```
 
-### Registry Setup
-
-This package is published to GitHub Packages. Create a `.npmrc` in your project root:
-
+`.npmrc` setup for GitHub Packages:
 ```
-@rareminds-eym:registry=https://npm.pkg.github.com/
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+@rareminds-eym:registry=https://npm.pkg.github.com
 ```
-
-Set `NODE_AUTH_TOKEN` to a GitHub PAT with `read:packages` scope.
 
 ## Quick Start
 
-### 1. Initialize (once at startup)
-
 ```ts
-import { initAuth } from "@rareminds-eym/auth-core";
+import { initAuth, withAuth } from "@rareminds-eym/auth-core";
 
+// Once at startup
 initAuth({
-  ssoDomain: "https://sso.rareminds.com",
+  ssoDomain: "https://sso-api.your-domain.workers.dev",
 });
-```
 
-### 2. Protect a route
-
-```ts
-import { withAuth } from "@rareminds-eym/auth-core";
-
+// Protect a route
 export const onRequestGet = withAuth(async (context) => {
   const user = context.data.user;
-  return Response.json({ user_id: user.sub, org: user.org_id });
+  return Response.json({ id: user.sub, org: user.org_id, verified: user.is_email_verified });
 });
 ```
-
-That's it. `withAuth` handles JWT verification, refresh token fallback, session validation, and error responses automatically.
 
 ## Configuration
 
 ```ts
 initAuth({
-  ssoDomain: "https://sso.rareminds.com",   // Required — your SSO base URL
-  ssoTimeoutMs: 3000,                        // Optional — fetch timeout (default: 5000ms)
-  validateSessionBeforeRefresh: false,        // Optional — skip /validate-session call (default: true)
-  issuer: "https://sso.rareminds.com",       // Optional — JWT issuer validation
-  audience: "rareminds-api",                 // Optional — JWT audience validation
+  ssoDomain: "https://sso-api.workers.dev",  // Required
+  issuer: "sso-api",                          // Default: "sso-api"
+  audience: "sso-client",                     // Default: "sso-client"
+  ssoTimeoutMs: 5000,                         // Default: 5000
+  validateSessionBeforeRefresh: false,         // Default: false
 });
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `ssoDomain` | `string` | — | Base URL of your SSO service |
-| `ssoTimeoutMs` | `number` | `5000` | Timeout in ms for all SSO fetch calls (must be > 0) |
-| `validateSessionBeforeRefresh` | `boolean` | `true` | Whether to call `/auth/validate-session` before `/auth/refresh`. Set to `false` if your refresh endpoint already rejects revoked sessions. |
-| `issuer` | `string` | — | Expected JWT `iss` claim. Recommended for multi-service setups. |
-| `audience` | `string` | — | Expected JWT `aud` claim. Recommended for multi-service setups. |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `ssoDomain` | — | SSO worker base URL (required) |
+| `issuer` | `"sso-api"` | Expected JWT `iss` claim |
+| `audience` | `"sso-client"` | Expected JWT `aud` claim |
+| `ssoTimeoutMs` | `5000` | Timeout for SSO fetch calls |
+| `validateSessionBeforeRefresh` | `false` | Call `/auth/me` before refresh (unnecessary — refresh rejects revoked sessions) |
 
-Safe to call `initAuth()` again — it clears all internal caches (JWKS, etc).
+Safe to call `initAuth()` multiple times — clears all caches (JWKS, etc).
 
 ## Auth Flow
 
 ```
-Request arrives
-    │
-    ├─ Has valid JWT? → Check membership active → ✅ Run handler
-    │
-    ├─ JWT expired/missing?
-    │   ├─ Has refresh_token cookie?
-    │   │   ├─ validateSession (optional) → ❌ 401 "Session expired"
-    │   │   ├─ refreshAccessToken         → ❌ 502 "Refresh failed"
-    │   │   └─ verifyJWT(new token)       → ✅ Run handler + X-Access-Token header
-    │   └─ No refresh token → ❌ 401 "Unauthorized"
-    │
-    └─ SSO unreachable → ❌ 502
+Request → Has valid JWT? → membership active? → ✅ Handler
+                         → membership inactive → 403
+        → JWT expired?   → Has refresh cookie? → Refresh → Verify new JWT → ✅ Handler
+                                                                              + Set-Cookie forwarded
+                                                                              + X-Access-Token header
+                         → No refresh cookie   → 401
+        → JWT invalid    → 401 (no refresh attempt)
 ```
 
-When a token is refreshed, the new JWT is attached to the response via the `X-Access-Token` header so the client can update its stored token.
+Key behavior: only `JWTExpired` errors trigger the refresh flow. Tampered, wrong-issuer, or wrong-audience tokens return 401 immediately.
+
+After refresh, `Set-Cookie` headers from the SSO worker are forwarded to the browser so cookies stay fresh.
 
 ## Middleware
 
 ### `withAuth`
-
-Authenticates the request. Tries the access token first, falls back to refresh token flow.
 
 ```ts
 import { withAuth } from "@rareminds-eym/auth-core";
 
 export const onRequestGet = withAuth(async (context) => {
   const user = context.data.user;
+  // user: { sub, email, org_id, roles, products, membership_status, is_email_verified }
   return Response.json(user);
 });
 ```
 
 ### `requireRole`
 
-Requires the user to have at least one of the specified roles. Must be nested inside `withAuth`.
-
 ```ts
 import { withAuth, requireRole } from "@rareminds-eym/auth-core";
 
-// Single role
 export const onRequestPost = withAuth(
-  requireRole("admin", async (context) => {
-    return Response.json({ ok: true });
-  })
-);
-
-// Multiple roles (user needs ANY one)
-export const onRequestGet = withAuth(
-  requireRole(["admin", "manager"], async (context) => {
+  requireRole(["admin", "owner"], async (context) => {
     return Response.json({ ok: true });
   })
 );
 ```
 
 ### `requireProduct`
-
-Requires the user to have access to at least one of the specified products.
 
 ```ts
 import { withAuth, requireProduct } from "@rareminds-eym/auth-core";
@@ -145,232 +104,162 @@ export const onRequestGet = withAuth(
     return Response.json({ feature: "unlocked" });
   })
 );
-
-// Multiple products
-export const onRequestGet = withAuth(
-  requireProduct(["hiring-platform", "lms"], async (context) => {
-    return Response.json({ feature: "unlocked" });
-  })
-);
-```
-
-### Composing Guards
-
-```ts
-export const onRequestPost = withAuth(
-  requireRole("admin",
-    requireProduct("hiring-platform", async (context) => {
-      // Only admins with hiring-platform access
-      return Response.json({ ok: true });
-    })
-  )
-);
 ```
 
 ### `withErrorHandler`
-
-Catches unhandled errors, logs structured JSON, and returns a clean 500 response.
 
 ```ts
 import { withErrorHandler, withAuth } from "@rareminds-eym/auth-core";
 
 export const onRequestGet = withErrorHandler(
   withAuth(async (context) => {
-    const data = await riskyOperation();
-    return Response.json(data);
+    return Response.json(await riskyOperation());
   })
 );
 ```
 
-Logs:
-```json
-{ "level": "error", "message": "...", "url": "...", "timestamp": "..." }
-```
-
-## Typed Context
-
-`ContextWithUser` is generic — pass your Cloudflare env bindings. After `withAuth`, use `AuthenticatedContext` where `user` is guaranteed:
+### Composing
 
 ```ts
-import { withAuth } from "@rareminds-eym/auth-core";
-import type { AuthenticatedContext } from "@rareminds-eym/auth-core";
-
-interface MyEnv {
-  DB: D1Database;
-  KV_STORE: KVNamespace;
-}
-
-export const onRequestGet = withAuth(async (context: AuthenticatedContext<MyEnv>) => {
-  const db = context.env.DB;
-  const user = context.data.user; // AuthUser — no ! needed
-  return Response.json({ ok: true });
-});
+export const onRequestPost = withErrorHandler(
+  withAuth(
+    requireRole("admin",
+      requireProduct("erp", async (context) => {
+        // Admin with ERP access only
+        return Response.json({ ok: true });
+      })
+    )
+  )
+);
 ```
 
-Available on context: `request`, `env`, `params`, `data`, `waitUntil()`, `passThroughOnException()`.
-
-## Re-initialization
-
-Safe to call `initAuth()` multiple times — useful for testing or multi-tenant setups. All internal caches (JWKS, etc.) are automatically cleared.
-
-```ts
-import { initAuth } from "@rareminds-eym/auth-core";
-
-// Switch to staging
-initAuth({ ssoDomain: "https://staging-sso.rareminds.com" });
-
-// Later, switch to production
-initAuth({ ssoDomain: "https://sso.rareminds.com" });
-```
-
-You can also register your own cleanup callbacks:
-
-```ts
-import { onConfigReset } from "@rareminds-eym/auth-core";
-
-const unsubscribe = onConfigReset(() => {
-  // Clear your own caches when initAuth is called again
-});
-
-// Later, if you no longer need the callback:
-unsubscribe();
-```
-
-## Standalone Utilities
-
-Every internal function is exported for custom use cases:
+## Standalone Functions
 
 ```ts
 import {
-  verifyJWT,            // Verify a JWT and get AuthUser
-  extractToken,         // Extract Bearer token from Authorization header
-  getRefreshToken,      // Extract refresh_token from Cookie header
-  validateSession,      // POST /auth/validate-session
-  refreshAccessToken,   // POST /auth/refresh
+  verifyJWT,            // Verify JWT → AuthUser
+  extractToken,         // Bearer header or access_token cookie → string | null
+  getRefreshToken,      // refresh_token cookie → string | null
+  refreshAccessToken,   // POST /auth/refresh → { access_token, setCookieHeaders }
+  validateSession,      // GET /auth/me → { valid, user? }
+  logout,               // POST /auth/logout → { success, setCookieHeaders }
   fetchWithTimeout,     // Fetch with configurable AbortController timeout
-  jsonError,            // Shared JSON error response helper
-  getConfig,            // Read current config
-  onConfigReset,        // Register cache-clearing callbacks
-  initAuth,             // Initialize / re-initialize config
+  jsonError,            // JSON error response helper
 } from "@rareminds-eym/auth-core";
 ```
 
-### Examples
+### Token extraction
+
+`extractToken` checks the `Authorization: Bearer` header first, then falls back to the `access_token` cookie — matching the SSO worker's extraction logic exactly.
+
+`getRefreshToken` returns the raw cookie value without URI decoding — matching the SSO worker's cookie parsing.
+
+### Refresh with cookie forwarding
 
 ```ts
-// Extract Bearer token from request
-const token = extractToken(request); // "eyJhbG..." | null
+const { access_token, setCookieHeaders } = await refreshAccessToken(refreshToken);
 
-// Extract refresh_token from Cookie header
-const refreshToken = getRefreshToken(request); // "abc123" | null
+// Forward cookies to the browser
+for (const cookie of setCookieHeaders) {
+  response.headers.append("Set-Cookie", cookie);
+}
+```
 
-// Verify a JWT manually
-const user = await verifyJWT(token);
-// { sub, org_id, roles, products, membership_status }
+### Server-side logout
 
-// Validate a session against SSO
-const session = await validateSession(refreshToken);
-// { valid: true, user: { ... } }
-
-// Refresh an access token via SSO
-const { access_token } = await refreshAccessToken(refreshToken);
-
-// Make any fetch call with the configured timeout
-const res = await fetchWithTimeout("https://api.example.com/data", {
-  method: "GET",
-});
-
-// Read current config
-const config = getConfig();
-// { ssoDomain, ssoTimeoutMs, validateSessionBeforeRefresh }
+```ts
+const { success, setCookieHeaders } = await logout(refreshToken);
+// Forward Set-Cookie headers to clear browser cookies
 ```
 
 ## Types
 
 ```ts
 import type {
-  AuthUser,                   // { sub, org_id, roles, products, membership_status }
+  AuthUser,                   // { sub, email, org_id, roles, products, membership_status, is_email_verified }
   MembershipStatus,           // "active" | "inactive" | "suspended" | "expired"
-  ContextWithUser,            // Generic Cloudflare-style context
-  AuthenticatedContext,       // Context where user is guaranteed (after withAuth)
-  SessionValidationResponse,  // { valid: boolean, user?: AuthUser }
-  AuthCoreConfig,             // initAuth() config shape
+  ContextWithUser,            // Generic Cloudflare context (user optional)
+  AuthenticatedContext,       // Context where user is guaranteed
+  SessionValidationResponse,  // { valid, user? }
+  AuthCoreConfig,             // initAuth() input
+  ResolvedAuthCoreConfig,     // Config with defaults applied
 } from "@rareminds-eym/auth-core";
 ```
 
-## SSO API Requirements
-
-Your SSO service must expose these endpoints:
-
-### `POST /auth/refresh`
-
-Request:
-```json
-{ "refresh_token": "string" }
-```
-
-Response:
-```json
-{ "access_token": "jwt-string" }
-```
-
-### `POST /auth/validate-session`
-
-Request:
-```json
-{ "refresh_token": "string" }
-```
-
-Response:
-```json
-{ "valid": true, "user": { "sub": "...", "org_id": "...", ... } }
-```
-
-### `GET /.well-known/jwks.json`
-
-Standard JWKS endpoint for JWT verification.
-
 ## JWT Claims
 
-The access token JWT must contain these claims:
+The SSO worker signs JWTs with these claims:
 
 | Claim | Type | Description |
 |-------|------|-------------|
 | `sub` | `string` | User ID |
-| `org_id` | `string` | Organization ID |
-| `roles` | `string[]` | User roles |
-| `products` | `string[]` | Product access list |
-| `membership_status` | `"active" \| "inactive" \| "suspended" \| "expired"` | Membership state |
+| `email` | `string` | User email |
+| `org_id` | `string` | Active organization ID |
+| `roles` | `string[]` | Roles in active org |
+| `products` | `string[]` | Product access codes |
+| `membership_status` | `MembershipStatus` | Membership state |
+| `is_email_verified` | `boolean` | Email verification status |
+| `iss` | `"sso-api"` | Issuer |
+| `aud` | `"sso-client"` | Audience |
 
-## Security Notes
-
-- Refresh tokens must be stored in **HTTP-only, Secure, SameSite=Strict** cookies
-- Refresh tokens are **never validated at the edge** — always delegated to SSO
-- SSO should **hash refresh tokens** in the database (store hash, not raw)
-- SSO should **rotate refresh tokens** on each use (issue new, invalidate old)
-- Access tokens should be **short-lived** (10–15 minutes)
+All claims are validated with strict type checking in `verifyJWT`.
 
 ## Error Responses
 
-All error responses are JSON:
-
 | Status | Error | When |
 |--------|-------|------|
-| `401` | `Invalid token` | JWT is tampered, wrong issuer/audience, or malformed |
+| `401` | `Invalid token` | JWT tampered, wrong issuer/audience |
 | `401` | `Unauthorized: no valid token or refresh token` | No JWT and no refresh cookie |
-| `401` | `Session expired or revoked` | Session validation failed |
-| `403` | `Inactive membership` | User membership is not active |
-| `403` | `Forbidden: insufficient role` | User lacks required role |
-| `403` | `Forbidden: product access denied` | User lacks product access |
+| `403` | `Inactive membership` | `membership_status` is not `"active"` |
+| `403` | `Forbidden: insufficient role` | Missing required role |
+| `403` | `Forbidden: product access denied` | Missing product access |
 | `500` | `Refreshed token is invalid` | SSO returned a bad JWT |
-| `500` | `Internal Server Error` | Unhandled error (via withErrorHandler) |
-| `502` | `Session validation failed` | SSO unreachable for session check |
-| `502` | `Token refresh failed` | SSO unreachable for token refresh |
+| `502` | `Token refresh failed` | SSO unreachable |
 
-## Building
+## Build
 
 ```bash
 npm run build
+```
+
+## Re-initialization
+
+Safe to call `initAuth()` multiple times — clears all caches. Useful for testing or multi-tenant setups:
+
+```ts
+initAuth({ ssoDomain: "https://staging-sso.workers.dev" });
+// Later...
+initAuth({ ssoDomain: "https://prod-sso.workers.dev" });
+```
+
+Register cleanup callbacks:
+
+```ts
+import { onConfigReset } from "@rareminds-eym/auth-core";
+
+const unsub = onConfigReset(() => {
+  // Clear your own caches when initAuth is called again
+});
+unsub(); // unsubscribe when done
+```
+
+## Typed Context
+
+`ContextWithUser` is generic — pass your Cloudflare env bindings:
+
+```ts
+import type { AuthenticatedContext } from "@rareminds-eym/auth-core";
+
+interface MyEnv {
+  DB: D1Database;
+  KV: KVNamespace;
+}
+
+export const onRequestGet = withAuth(async (context: AuthenticatedContext<MyEnv>) => {
+  const db = context.env.DB;
+  const user = context.data.user; // AuthUser — guaranteed present
+  return Response.json({ ok: true });
+});
 ```
 
 ## Project Structure
@@ -378,31 +267,27 @@ npm run build
 ```
 auth-core/
 ├── src/
-│   ├── config.ts                  # initAuth, getConfig, onConfigReset
 │   ├── index.ts                   # Barrel exports
-│   ├── types/
-│   │   └── auth.ts                # AuthUser, MembershipStatus, ContextWithUser, SessionValidationResponse
-│   ├── jwt/
-│   │   └── verifyJWT.ts           # JWT verification via JWKS + payload validation
-│   ├── utils/
-│   │   ├── extractToken.ts        # Bearer token extraction from Authorization header
-│   │   ├── getRefreshToken.ts     # Refresh token extraction from Cookie header
-│   │   ├── fetchWithTimeout.ts    # Fetch wrapper with AbortController timeout
-│   │   └── jsonError.ts           # Shared JSON error response helper
+│   ├── config.ts                  # initAuth, getConfig, onConfigReset
+│   ├── types/auth.ts              # AuthUser, MembershipStatus, Context types
+│   ├── jwt/verifyJWT.ts           # JWKS-based JWT verification + claim validation
+│   ├── middleware/
+│   │   ├── withAuth.ts            # Auth middleware (JWT + refresh + cookie forwarding)
+│   │   ├── requireRole.ts         # Role guard
+│   │   ├── requireProduct.ts      # Product guard
+│   │   └── withErrorHandler.ts    # Global error handler
 │   ├── session/
-│   │   ├── refreshAccessToken.ts  # POST /auth/refresh
-│   │   └── validateSession.ts     # POST /auth/validate-session
-│   └── middleware/
-│       ├── withAuth.ts            # Main auth middleware (JWT + refresh flow)
-│       ├── requireRole.ts         # Role-based access guard
-│       ├── requireProduct.ts      # Product-based access guard
-│       └── withErrorHandler.ts    # Global error handler with structured logging
-├── dist/                          # Compiled output (gitignored)
+│   │   ├── refreshAccessToken.ts  # POST /auth/refresh (captures Set-Cookie)
+│   │   ├── validateSession.ts     # GET /auth/me
+│   │   └── logout.ts             # POST /auth/logout (captures Set-Cookie)
+│   └── utils/
+│       ├── extractToken.ts        # Bearer header + access_token cookie fallback
+│       ├── getRefreshToken.ts     # refresh_token cookie (raw, no URI decode)
+│       ├── fetchWithTimeout.ts    # AbortController timeout wrapper
+│       └── jsonError.ts           # JSON error response helper
+├── dist/
 ├── package.json
-├── tsconfig.json
-├── .npmrc
-├── .gitignore
-└── README.md
+└── tsconfig.json
 ```
 
 ## License

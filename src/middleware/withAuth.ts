@@ -4,8 +4,6 @@ import { extractToken } from "../utils/extractToken";
 import { getRefreshToken } from "../utils/getRefreshToken";
 import { jsonError } from "../utils/jsonError";
 import { refreshAccessToken } from "../session/refreshAccessToken";
-import { validateSession } from "../session/validateSession";
-import { getConfig } from "../config";
 import type { ContextWithUser, AuthenticatedContext } from "../types/auth";
 
 export function withAuth(
@@ -40,28 +38,16 @@ export function withAuth(
       return jsonError("Unauthorized: no valid token or refresh token", 401);
     }
 
-    // 3. Optionally validate session is still active in SSO DB
-    const { validateSessionBeforeRefresh } = getConfig();
-    if (validateSessionBeforeRefresh) {
-      try {
-        const session = await validateSession(refreshToken);
-        if (!session.valid) {
-          return jsonError("Session expired or revoked", 401);
-        }
-      } catch {
-        return jsonError("Session validation failed", 502);
-      }
-    }
-
-    // 4. Get new access token
+    // 3. Get new access token (includes Set-Cookie headers from the worker)
     let access_token: string;
+    let setCookieHeaders: string[];
     try {
-      ({ access_token } = await refreshAccessToken(refreshToken));
+      ({ access_token, setCookieHeaders } = await refreshAccessToken(refreshToken));
     } catch {
       return jsonError("Token refresh failed", 502);
     }
 
-    // 5. Verify the new access token
+    // 4. Verify the new access token
     try {
       const user = await verifyJWT(access_token);
 
@@ -74,10 +60,16 @@ export function withAuth(
       return jsonError("Refreshed token is invalid", 500);
     }
 
-    // 6. Run handler and attach new token to response (safe for immutable responses)
+    // 5. Run handler and attach new token + forwarded cookies to response
     const response = await handler(context as AuthenticatedContext);
     const newHeaders = new Headers(response.headers);
     newHeaders.set("X-Access-Token", access_token);
+
+    // Forward Set-Cookie headers from the SSO worker so the browser
+    // gets the rotated access_token + refresh_token cookies.
+    for (const cookie of setCookieHeaders) {
+      newHeaders.append("Set-Cookie", cookie);
+    }
 
     return new Response(response.body, {
       status: response.status,

@@ -1,6 +1,6 @@
 {
   "name": "@rareminds-eym/auth-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared auth middleware for Cloudflare Functions",
   "license": "UNLICENSED",
   "type": "module",

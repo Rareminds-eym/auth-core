@@ -1,6 +1,13 @@
 export interface AuthCoreConfig {
   ssoDomain: string;
   /**
+   * Optional Cloudflare Service Binding fetcher for the SSO worker.
+   * When provided, all SSO HTTP calls route through this binding
+   * (zero-latency, no public URL needed) instead of global fetch().
+   * The binding's .fetch() is called with a Request object.
+   */
+  ssoFetcher?: Fetcher;
+  /**
    * Expected JWT issuer claim.
    * Default: "sso-api" (matches the SSO worker).
    */
@@ -36,6 +43,7 @@ export interface ResolvedAuthCoreConfig extends AuthCoreConfig {
   issuer: string;
   audience: string;
   validateSessionBeforeRefresh: boolean;
+  ssoFetcher?: Fetcher;
 }
 
 let _config: ResolvedAuthCoreConfig | null = null;
@@ -85,6 +93,7 @@ export function initAuth(config: AuthCoreConfig): void {
     issuer: config.issuer ?? DEFAULT_ISSUER,
     audience: config.audience ?? DEFAULT_AUDIENCE,
     validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? false,
+    ssoFetcher: config.ssoFetcher ?? undefined,
   };
 
   // Flush all cached state that depends on config

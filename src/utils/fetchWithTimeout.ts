@@ -3,12 +3,16 @@ import { getConfig } from "../config.js";
 /**
  * Fetch wrapper with configurable timeout via AbortController.
  * Respects any caller-provided signal — aborts if either fires.
+ *
+ * When ssoFetcher (Cloudflare Service Binding) is configured, routes
+ * requests through the binding for zero-latency inter-Worker calls.
+ * Otherwise falls back to global fetch().
  */
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit
 ): Promise<Response> {
-  const { ssoTimeoutMs } = getConfig();
+  const { ssoTimeoutMs, ssoFetcher } = getConfig();
   const controller = new AbortController();
 
   // If caller's signal is already aborted, abort immediately
@@ -30,6 +34,14 @@ export async function fetchWithTimeout(
 
   try {
     const { signal: _discarded, ...rest } = init;
+
+    if (ssoFetcher) {
+      // Service binding: construct a Request object and call fetcher.fetch()
+      const req = new Request(url, { ...rest, signal: controller.signal });
+      return await ssoFetcher.fetch(req);
+    }
+
+    // Fallback: global fetch (for non-Cloudflare or when binding not configured)
     return await fetch(url, { ...rest, signal: controller.signal });
   } finally {
     clearTimeout(timeout);

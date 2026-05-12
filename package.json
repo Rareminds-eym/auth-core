@@ -27,12 +27,13 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "jose": "^5.0.0"
+    "jose": "^6.2.3"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260511.1",
     "typescript": "^5.7.0"
   }
 }

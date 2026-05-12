@@ -1,4 +1,4 @@
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { jwtVerify, createRemoteJWKSet, customFetch } from "jose";
 import type { AuthUser, MembershipStatus } from "../types/auth.js";
 import { getConfig, onConfigReset } from "../config.js";
 
@@ -11,10 +11,21 @@ onConfigReset(() => {
 
 function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
   if (!_jwks) {
-    const { ssoDomain } = getConfig();
-    _jwks = createRemoteJWKSet(
-      new URL(`${ssoDomain}/.well-known/jwks.json`)
-    );
+    const { ssoDomain, ssoFetcher } = getConfig();
+    const jwksUrl = new URL(`${ssoDomain}/.well-known/jwks.json`);
+
+    if (ssoFetcher) {
+      // Route JWKS requests through the Cloudflare Service Binding
+      _jwks = createRemoteJWKSet(jwksUrl, {
+        [customFetch]: (...args: Parameters<typeof fetch>) => {
+          const [input, init] = args;
+          const req = new Request(input, init);
+          return ssoFetcher.fetch(req);
+        },
+      });
+    } else {
+      _jwks = createRemoteJWKSet(jwksUrl);
+    }
   }
   return _jwks;
 }

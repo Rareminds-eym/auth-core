@@ -43,8 +43,11 @@ export function withAuth(
     let setCookieHeaders: string[];
     try {
       ({ access_token, setCookieHeaders } = await refreshAccessToken(refreshToken));
-    } catch {
-      return jsonError("Token refresh failed", 502);
+    } catch (err) {
+      return jsonError(
+        err instanceof Error ? `Token refresh failed: ${err.message}` : "Session expired",
+        401
+      );
     }
 
     // 4. Verify the new access token

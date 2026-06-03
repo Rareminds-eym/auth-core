@@ -11,21 +11,17 @@ onConfigReset(() => {
 
 function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
   if (!_jwks) {
-    const { ssoDomain, ssoFetcher } = getConfig();
-    const jwksUrl = new URL(`${ssoDomain}/.well-known/jwks.json`);
+    const { ssoRpc } = getConfig();
+    // A dummy URL is required by createRemoteJWKSet, but our customFetch
+    // totally ignores it and uses the RPC service.
+    const jwksUrl = new URL("http://rpc/.well-known/jwks.json");
 
-    if (ssoFetcher) {
-      // Route JWKS requests through the Cloudflare Service Binding
-      _jwks = createRemoteJWKSet(jwksUrl, {
-        [customFetch]: (...args: Parameters<typeof fetch>) => {
-          const [input, init] = args;
-          const req = new Request(input, init);
-          return ssoFetcher.fetch(req);
-        },
-      });
-    } else {
-      _jwks = createRemoteJWKSet(jwksUrl);
-    }
+    _jwks = createRemoteJWKSet(jwksUrl, {
+      [customFetch]: async () => {
+        const data = await ssoRpc.getJWKS();
+        return new Response(JSON.stringify(data));
+      },
+    });
   }
   return _jwks;
 }

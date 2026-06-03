@@ -1,12 +1,18 @@
+export interface SsoRpcService {
+  getJWKS(): Promise<{ keys: any[] }>;
+  refreshSession(refreshToken: string, ip?: string, ua?: string): Promise<{ access_token: string, refresh_token: string }>;
+  getMe(accessToken: string): Promise<Record<string, unknown>>;
+  logoutSession(refreshToken: string, ip?: string, ua?: string): Promise<{ success: boolean }>;
+}
+
 export interface AuthCoreConfig {
-  ssoDomain: string;
   /**
-   * Optional Cloudflare Service Binding fetcher for the SSO worker.
-   * When provided, all SSO HTTP calls route through this binding
-   * (zero-latency, no public URL needed) instead of global fetch().
-   * The binding's .fetch() is called with a Request object.
+   * Required Cloudflare Service Binding for the SSO worker.
+   * auth-core strictly uses true RPC methods for zero-latency
+   * inter-worker communication, enforcing a 100% RPC ecosystem.
    */
-  ssoFetcher?: Fetcher;
+  ssoRpc: SsoRpcService;
+
   /**
    * Expected JWT issuer claim.
    * Default: "sso-api" (matches the SSO worker).
@@ -17,8 +23,7 @@ export interface AuthCoreConfig {
    * Default: "sso-client" (matches the SSO worker).
    */
   audience?: string;
-  /** Timeout in ms for SSO fetch calls. Default: 5000 */
-  ssoTimeoutMs?: number;
+
   /**
    * Whether to validate the session before refreshing.
    * When true, calls GET /auth/me before /auth/refresh.
@@ -34,16 +39,11 @@ const DEFAULT_ISSUER = "sso-api";
 /** Default JWT audience — matches the SSO worker's signing config */
 const DEFAULT_AUDIENCE = "sso-client";
 
-/**
- * Internal resolved config where defaults have been applied.
- * Guarantees ssoTimeoutMs, issuer, audience, and validateSessionBeforeRefresh are set.
- */
 export interface ResolvedAuthCoreConfig extends AuthCoreConfig {
-  ssoTimeoutMs: number;
   issuer: string;
   audience: string;
   validateSessionBeforeRefresh: boolean;
-  ssoFetcher?: Fetcher;
+  ssoRpc: SsoRpcService;
 }
 
 let _config: ResolvedAuthCoreConfig | null = null;
@@ -67,33 +67,16 @@ export function onConfigReset(fn: () => void): () => void {
  * Safe to call again — clears all internal caches (JWKS, etc).
  */
 export function initAuth(config: AuthCoreConfig): void {
-  if (!config.ssoDomain || typeof config.ssoDomain !== "string") {
-    throw new Error("ssoDomain is required and must be a non-empty string");
+  if (!config.ssoRpc) {
+    throw new Error("ssoRpc is strictly required. You must provide a True RPC Service Binding to the SSO worker.");
   }
-
-  // Validate it's a parseable URL
-  try {
-    new URL(config.ssoDomain);
-  } catch {
-    throw new Error(`ssoDomain is not a valid URL: ${config.ssoDomain}`);
-  }
-
-  const timeout = config.ssoTimeoutMs ?? 5000;
-  if (timeout <= 0) {
-    throw new Error("ssoTimeoutMs must be a positive number");
-  }
-
-  // Normalize: strip trailing slash to avoid double-slash in constructed URLs
-  const ssoDomain = config.ssoDomain.replace(/\/+$/, "");
 
   _config = {
     ...config,
-    ssoDomain,
-    ssoTimeoutMs: timeout,
     issuer: config.issuer ?? DEFAULT_ISSUER,
     audience: config.audience ?? DEFAULT_AUDIENCE,
     validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? false,
-    ssoFetcher: config.ssoFetcher ?? undefined,
+    ssoRpc: config.ssoRpc,
   };
 
   // Flush all cached state that depends on config
@@ -103,7 +86,7 @@ export function initAuth(config: AuthCoreConfig): void {
 export function getConfig(): ResolvedAuthCoreConfig {
   if (!_config) {
     throw new Error(
-      "auth-core not initialized. Call initAuth({ ssoDomain: '...' }) before using any middleware."
+      "auth-core not initialized. Call initAuth({ ssoRpc: env.SSO_SERVICE }) before using any middleware."
     );
   }
   return _config;

@@ -1,6 +1,6 @@
 {
   "name": "@rareminds-eym/auth-core",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Shared auth middleware for Cloudflare Functions",
   "license": "UNLICENSED",
   "type": "module",
@@ -24,6 +24,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260511.1",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
   }
 }

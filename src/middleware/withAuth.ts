@@ -1,10 +1,10 @@
 import { errors } from "jose";
 import { verifyJWT } from "../jwt/verifyJWT.js";
+import { refreshAccessToken } from "../session/refreshAccessToken.js";
+import type { AuthenticatedContext, ContextWithUser } from "../types/auth.js";
 import { extractToken } from "../utils/extractToken.js";
 import { getRefreshToken } from "../utils/getRefreshToken.js";
 import { jsonError } from "../utils/jsonError.js";
-import { refreshAccessToken } from "../session/refreshAccessToken.js";
-import type { ContextWithUser, AuthenticatedContext } from "../types/auth.js";
 
 export function withAuth(
   handler: (context: AuthenticatedContext) => Promise<Response> | Response
@@ -42,7 +42,10 @@ export function withAuth(
     let access_token: string;
     let setCookieHeaders: string[];
     try {
-      ({ access_token, setCookieHeaders } = await refreshAccessToken(refreshToken));
+      // Forward CF-Connecting-IP and User-Agent for audit/session metadata (Requirement 16.1, 16.2)
+      const ip = context.request.headers.get("CF-Connecting-IP") ?? undefined;
+      const ua = context.request.headers.get("User-Agent") ?? undefined;
+      ({ access_token, setCookieHeaders } = await refreshAccessToken(refreshToken, ip, ua));
     } catch (err) {
       return jsonError(
         err instanceof Error ? `Token refresh failed: ${err.message}` : "Session expired",
@@ -69,7 +72,7 @@ export function withAuth(
     newHeaders.set("X-Access-Token", access_token);
 
     // Forward Set-Cookie headers from the SSO worker so the browser
-    // gets the rotated access_token + refresh_token cookies.
+    // gets the rotated refresh_token cookie.
     for (const cookie of setCookieHeaders) {
       newHeaders.append("Set-Cookie", cookie);
     }

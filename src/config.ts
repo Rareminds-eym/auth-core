@@ -31,6 +31,12 @@ export interface AuthCoreConfig {
    * Default: false
    */
   validateSessionBeforeRefresh?: boolean;
+
+  /**
+   * Optional registrable parent domain for the refresh cookie.
+   * Required for cross-site cookie delivery (e.g. apps on subdomains).
+   */
+  refreshCookieDomain?: string;
 }
 
 /** Default JWT issuer — matches the SSO worker's signing config */
@@ -44,6 +50,7 @@ export interface ResolvedAuthCoreConfig extends AuthCoreConfig {
   audience: string;
   validateSessionBeforeRefresh: boolean;
   ssoRpc: SsoRpcService;
+  refreshCookieDomain?: string;
 }
 
 let _config: ResolvedAuthCoreConfig | null = null;
@@ -77,6 +84,7 @@ export function initAuth(config: AuthCoreConfig): void {
     audience: config.audience ?? DEFAULT_AUDIENCE,
     validateSessionBeforeRefresh: config.validateSessionBeforeRefresh ?? false,
     ssoRpc: config.ssoRpc,
+    refreshCookieDomain: config.refreshCookieDomain,
   };
 
   // Flush all cached state that depends on config

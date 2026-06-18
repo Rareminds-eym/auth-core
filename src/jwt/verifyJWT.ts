@@ -42,7 +42,7 @@ const VALID_MEMBERSHIP_STATUSES: Set<string> = new Set([
  * with correct types, including array element validation.
  */
 function assertAuthUser(payload: Record<string, unknown>): AuthUser {
-  const { sub, email, org_id, roles, products, membership_status, is_email_verified } = payload;
+  const { sub, email, org_id, roles, products, membership_status, is_email_verified, user_metadata } = payload;
 
   if (typeof sub !== "string") {
     throw new Error("JWT missing required claim: sub");
@@ -79,6 +79,7 @@ function assertAuthUser(payload: Record<string, unknown>): AuthUser {
     products,
     membership_status: membership_status as MembershipStatus,
     is_email_verified,
+    user_metadata: user_metadata as Record<string, unknown> | undefined,
   };
 }
 

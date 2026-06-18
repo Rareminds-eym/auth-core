@@ -8,6 +8,7 @@ export interface AuthUser {
   products: string[];
   membership_status: MembershipStatus;
   is_email_verified: boolean;
+  user_metadata?: Record<string, unknown>;
 }
 
 export interface SessionValidationResponse {

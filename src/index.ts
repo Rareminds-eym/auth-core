@@ -20,5 +20,6 @@ export type {
   VerifiedAuthContext,
   VerifiedAuthUser,
   VerifiedAuthUser as AuthUser,
+  SsoServiceBinding,
 } from "./types/public.js";
 

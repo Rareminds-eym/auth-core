@@ -6,7 +6,8 @@ import { CoreFailure } from "./errors.js";
 import { SafeObserver } from "./observability.js";
 
 const KEY_FIELDS = new Set(["alg", "e", "kid", "kty", "n", "status", "use"]);
-const SNAPSHOT_FIELDS = new Set(["correlationId", "freshnessSeconds", "keys", "kind"]);
+// freshnessSeconds is optional in SsoJwksSnapshot — only required fields are validated.
+const REQUIRED_SNAPSHOT_FIELDS = new Set(["correlationId", "keys", "kind"]);
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 type LocalKeySet = ReturnType<typeof createLocalJWKSet>;
@@ -36,13 +37,25 @@ export function jwksFailureReason(error: unknown) {
     return "INTERNAL_FAILURE" as const;
 }
 
-function hasOnlyFields(value: object, allowed: ReadonlySet<string>): boolean {
+/**
+ * Guards against prototype-pollution attacks by requiring a plain object.
+ * Allows extra string or symbol-keyed fields so RPC transports (e.g. Cloudflare
+ * miniflare) that attach internal symbol metadata to serialized objects do not
+ * cause false `INVALID_RESPONSE` rejections.
+ */
+function isPlainRecord(value: object): boolean {
     const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return false;
+    return prototype === Object.prototype || prototype === null;
+}
 
+/**
+ * Guards against TOCTOU attacks by ensuring every field in `required` is an
+ * own data property (no getter/setter) on `value`. Fields outside `required`
+ * are not examined — they may be extra transport metadata and are never read.
+ */
+function hasDataProperties(value: object, required: ReadonlySet<string>): boolean {
     const descriptors = Object.getOwnPropertyDescriptors(value);
-    return Reflect.ownKeys(value).every((field) => {
-        if (typeof field !== "string" || !allowed.has(field)) return false;
+    return [...required].every((field) => {
         const descriptor = descriptors[field];
         return descriptor !== undefined && descriptor.get === undefined && descriptor.set === undefined;
     });
@@ -74,8 +87,10 @@ function effectiveFreshness(
     return invalidResponse();
 }
 function validatedKey(value: unknown): SsoJwksKey {
-    if (value === null || typeof value !== "object" || Array.isArray(value) ||
-        !hasOnlyFields(value, KEY_FIELDS)) {
+    if (
+        value === null || typeof value !== "object" || Array.isArray(value) ||
+        !isPlainRecord(value) || !hasDataProperties(value, KEY_FIELDS)
+    ) {
         return invalidResponse();
     }
 
@@ -100,7 +115,11 @@ async function acceptedSnapshot(
     configuredSeconds: number | undefined,
 ): Promise<AcceptedJwksSnapshot> {
     try {
-        if (!hasOnlyFields(value, SNAPSHOT_FIELDS) || !isDenseArray(value.keys)) {
+        if (
+            !isPlainRecord(value) ||
+            !hasDataProperties(value, REQUIRED_SNAPSHOT_FIELDS) ||
+            !isDenseArray(value.keys)
+        ) {
             return invalidResponse();
         }
         const freshness = effectiveFreshness(value.freshnessSeconds, configuredSeconds);
@@ -142,6 +161,7 @@ function validateOutcome(
 ): SsoJwksSnapshot {
     if (
         outcome === null || typeof outcome !== "object" || Array.isArray(outcome) ||
+        !isPlainRecord(outcome) ||
         !isValidCorrelationId((outcome as { correlationId?: unknown }).correlationId) ||
         (outcome as { correlationId: string }).correlationId !== correlationId
     ) {

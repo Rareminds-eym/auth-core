@@ -88,19 +88,25 @@ function parsePair(rawPair: string): Readonly<{ name: string; value: string; raw
 
 function parseCookieHeader(cookieHeader: unknown): CookieParseResult {
     if (cookieHeader === null || cookieHeader === undefined) return MISSING;
-    if (typeof cookieHeader !== "string" || cookieHeader.length === 0) return INVALID;
+    if (typeof cookieHeader !== "string" || cookieHeader.length === 0) return MISSING;
 
     let configuredValue: string | undefined;
     const pairs = cookieHeader.split(";");
     for (let index = 0; index < pairs.length; index += 1) {
         const indexedPair = pairs[index]!;
-        const rawPair = index === 0 ? indexedPair : indexedPair.charAt(0) === " "
-            ? indexedPair.slice(1)
-            : undefined;
-        if (rawPair === undefined) return INVALID;
+        // RFC 6265 §4.2.1: OWS (optional whitespace) is permitted around the
+        // "=" and between pairs. Browsers and proxies use one space, but some
+        // emit none or multiple spaces. We trim only ASCII SP/HTAB to avoid
+        // Unicode-normalisation aliases; the value itself is still validated
+        // strictly by parsePair / COOKIE_OCTETS.
+        const rawPair = trimStartBadWhitespace(trimEndBadWhitespace(indexedPair));
+        // Skip completely empty segments (e.g. trailing semicolon).
+        if (rawPair.length === 0) continue;
 
         const pair = parsePair(rawPair);
-        if (pair === undefined) return INVALID;
+        // Unrecognised pairs are skipped so other cookies in the header do not
+        // invalidate the refresh token cookie that we are looking for.
+        if (pair === undefined) continue;
         const { name, value, rawValueBytes } = pair;
         const normalizedName = name.toLowerCase();
         if (
@@ -119,6 +125,7 @@ function parseCookieHeader(cookieHeader: unknown): CookieParseResult {
         ? MISSING
         : Object.freeze({ kind: "present", value: configuredValue });
 }
+
 
 /**
  * Creates an instance-owned codec whose policy cannot be changed to a parent

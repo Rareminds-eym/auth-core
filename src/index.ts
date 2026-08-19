@@ -17,6 +17,7 @@ export type {
   AuthObservationReason, AuthenticatedContext, AuthenticatedHandler, ContextWithUser, FeatureCheck,
   MembershipStatus,
   RequestHandler,
+  SsoServiceBinding,
   VerifiedAuthContext,
   VerifiedAuthUser,
   VerifiedAuthUser as AuthUser,

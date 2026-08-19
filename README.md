@@ -1,295 +1,141 @@
 # @rareminds-eym/auth-core
 
-Server-side auth middleware for Cloudflare Functions. Stateless JWT verification at the edge via JWKS, automatic refresh token flow, role and product guards — purpose-built for the SSO worker.
+Trusted-runtime authentication middleware for Rareminds applications. Version 3 is a clean break: consumers use one isolated `createAuth` facade; token extraction, JWT/JWKS implementation, cookies, refresh, logout, and response construction are package-private.
 
-## Install
+## Runtime support
+
+- Node.js 18 or newer
+- Cloudflare Workers-compatible Web APIs
+- ESM and TypeScript declarations
+
+## Installation
 
 ```bash
-npm install @rareminds-eym/auth-core
+npm install @rareminds-eym/auth-core@3.0.0
 ```
 
-`.npmrc` setup for GitHub Packages:
-```
-@rareminds-eym:registry=https://npm.pkg.github.com
-```
+## Public API
 
-## Quick Start
+The package root has one runtime export, `createAuth`, plus its public configuration, handler, verified-context, observation, and safe-error types. Package subpaths are not exported.
 
 ```ts
-import { initAuth, withAuth } from "@rareminds-eym/auth-core";
+import { createAuth } from "@rareminds-eym/auth-core";
+import type { AuthCoreConfig, VerifiedAuthContext } from "@rareminds-eym/auth-core";
 
-// Once at startup
-initAuth({
-  ssoDomain: "https://sso-api.your-domain.workers.dev",
-});
+const config: AuthCoreConfig = {
+  sso: env.SSO_SERVICE,
+  issuer: "https://sso.example.com",
+  audience: "skillpassport-api",
+  approvedOrigins: ["https://app.example.com"],
+  basePath: "/api/auth",
+  csrf: { name: "X-RM-CSRF", value: "1" },
+  cookieMaxAgeSeconds: 2_592_000,
+  jwksMaxAgeSeconds: 300,
+  ssoRequestTimeoutMs: 8_000,
+};
 
-// Protect a route
-export const onRequestGet = withAuth(async (context) => {
-  const user = context.data.user;
-  return Response.json({ id: user.sub, org: user.org_id, verified: user.is_email_verified });
-});
-```
+const auth = createAuth(config);
 
-## Configuration
-
-```ts
-initAuth({
-  ssoDomain: "https://sso-api.workers.dev",  // Required
-  issuer: "sso-api",                          // Default: "sso-api"
-  audience: "sso-client",                     // Default: "sso-client"
-  ssoTimeoutMs: 5000,                         // Default: 5000
-  validateSessionBeforeRefresh: false,         // Default: false
-});
-```
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `ssoDomain` | — | SSO worker base URL (required) |
-| `issuer` | `"sso-api"` | Expected JWT `iss` claim |
-| `audience` | `"sso-client"` | Expected JWT `aud` claim |
-| `ssoTimeoutMs` | `5000` | Timeout for SSO fetch calls |
-| `validateSessionBeforeRefresh` | `false` | Call `/auth/me` before refresh (unnecessary — refresh rejects revoked sessions) |
-
-Safe to call `initAuth()` multiple times — clears all caches (JWKS, etc).
-
-## Auth Flow
-
-```
-Request → Has valid JWT? → membership active? → ✅ Handler
-                         → membership inactive → 403
-        → JWT expired?   → Has refresh cookie? → Refresh → Verify new JWT → ✅ Handler
-                                                                              + Set-Cookie forwarded
-                                                                              + X-Access-Token header
-                         → No refresh cookie   → 401
-        → JWT invalid    → 401 (no refresh attempt)
-```
-
-Key behavior: only `JWTExpired` errors trigger the refresh flow. Tampered, wrong-issuer, or wrong-audience tokens return 401 immediately.
-
-After refresh, `Set-Cookie` headers from the SSO worker are forwarded to the browser so cookies stay fresh.
-
-## Middleware
-
-### `withAuth`
-
-```ts
-import { withAuth } from "@rareminds-eym/auth-core";
-
-export const onRequestGet = withAuth(async (context) => {
-  const user = context.data.user;
-  // user: { sub, email, org_id, roles, products, membership_status, is_email_verified }
-  return Response.json(user);
-});
-```
-
-### `requireRole`
-
-```ts
-import { withAuth, requireRole } from "@rareminds-eym/auth-core";
-
-export const onRequestPost = withAuth(
-  requireRole(["admin", "owner"], async (context) => {
-    return Response.json({ ok: true });
-  })
+export const onRequestGet = auth.authenticate(
+  async (_request: Request, context: VerifiedAuthContext) =>
+    Response.json({ subject: context.user.sub }),
 );
 ```
+## Configuration validation
 
-### `requireProduct`
+`createAuth` rejects configuration before creating an instance when:
 
-```ts
-import { withAuth, requireProduct } from "@rareminds-eym/auth-core";
+- issuer or audience is empty, unnormalized, contains controls, or is oversized;
+- an approved/CORS origin is wildcard, opaque, non-HTTPS, contains credentials, path, query, or fragment, is duplicated, or is not serialized exactly as an origin;
+- `basePath` is cross-origin, network-path, unnormalized, query-bearing, fragment-bearing, or has a trailing slash;
+- CSRF is not exactly `X-RM-CSRF: 1`;
+- cookie/JWKS/SSO timeout bounds are not positive finite safe integers;
+- credentialed CORS contains an origin outside `approvedOrigins`; or
+- the private SSO binding or optional callbacks have invalid types.
 
-export const onRequestGet = withAuth(
-  requireProduct("hiring-platform", async (context) => {
-    return Response.json({ feature: "unlocked" });
-  })
-);
-```
+Every factory call captures issuer, audience, fixed verification algorithm, and the bound SSO method in a new closure. Later mutation of the caller's config object cannot retarget an existing verifier.
 
-### `withErrorHandler`
+## Authentication and context
 
-```ts
-import { withErrorHandler, withAuth } from "@rareminds-eym/auth-core";
+`auth.authenticate(handler)` accepts one `Authorization` field containing one RFC Bearer token. It does not read an access-token cookie and does not refresh inside a protected handler. Missing, malformed, comma-combined, or multiple credentials fail closed.
 
-export const onRequestGet = withErrorHandler(
-  withAuth(async (context) => {
-    return Response.json(await riskyOperation());
-  })
-);
-```
-
-### Composing
+A successful handler receives a detached, deeply frozen `VerifiedAuthContext`:
 
 ```ts
-export const onRequestPost = withErrorHandler(
-  withAuth(
-    requireRole("admin",
-      requireProduct("erp", async (context) => {
-        // Admin with ERP access only
-        return Response.json({ ok: true });
-      })
-    )
-  )
-);
-```
-
-## Standalone Functions
-
-```ts
-import {
-  verifyJWT,            // Verify JWT → AuthUser
-  extractToken,         // Bearer header or access_token cookie → string | null
-  getRefreshToken,      // refresh_token cookie → string | null
-  refreshAccessToken,   // POST /auth/refresh → { access_token, setCookieHeaders }
-  validateSession,      // GET /auth/me → { valid, user? }
-  logout,               // POST /auth/logout → { success, setCookieHeaders }
-  fetchWithTimeout,     // Fetch with configurable AbortController timeout
-  jsonError,            // JSON error response helper
-} from "@rareminds-eym/auth-core";
-```
-
-### Token extraction
-
-`extractToken` checks the `Authorization: Bearer` header first, then falls back to the `access_token` cookie — matching the SSO worker's extraction logic exactly.
-
-`getRefreshToken` returns the raw cookie value without URI decoding — matching the SSO worker's cookie parsing.
-
-### Refresh with cookie forwarding
-
-```ts
-const { access_token, setCookieHeaders } = await refreshAccessToken(refreshToken);
-
-// Forward cookies to the browser
-for (const cookie of setCookieHeaders) {
-  response.headers.append("Set-Cookie", cookie);
+interface VerifiedAuthContext {
+  readonly user: VerifiedAuthUser;
+  readonly verification: "verified";
+  readonly correlationId: string;
 }
 ```
 
-### Server-side logout
+Authorization guards compose after authentication:
 
 ```ts
-const { success, setCookieHeaders } = await logout(refreshToken);
-// Forward Set-Cookie headers to clear browser cookies
+const adminRoute = auth.authenticate(
+  auth.requireActiveMembership(
+    auth.requireRole(["admin"], async (_request, context) =>
+      Response.json({ subject: context.user.sub }),
+    ),
+  ),
+);
 ```
 
-## Types
+Guards accept only the immutable context verified for their current request. Calling a guard directly, reusing a context on another request, or supplying a structural lookalike fails with `INVALID_TOKEN` before policy or handler execution. Protected routes never authenticate or refresh from cookies.
 
-```ts
-import type {
-  AuthUser,                   // { sub, email, org_id, roles, products, membership_status, is_email_verified }
-  MembershipStatus,           // "active" | "inactive" | "suspended" | "expired"
-  ContextWithUser,            // Generic Cloudflare context (user optional)
-  AuthenticatedContext,       // Context where user is guaranteed
-  SessionValidationResponse,  // { valid, user? }
-  AuthCoreConfig,             // initAuth() input
-  ResolvedAuthCoreConfig,     // Config with defaults applied
-} from "@rareminds-eym/auth-core";
+## Safe errors
+
+Public failures use a closed JSON envelope with static messages:
+
+```json
+{
+  "error": {
+    "code": "INVALID_TOKEN",
+    "status": 401,
+    "retryable": false,
+    "message": "The access token is invalid.",
+    "correlationId": "request:abc-123"
+  }
+}
 ```
+| Code | HTTP | Retryable |
+|---|---:|:---:|
+| `REQUEST_VALIDATION_REJECTED` | 403 | No |
+| `MISSING_CREDENTIALS` | 401 | No |
+| `INVALID_TOKEN` | 401 | No |
+| `EXPIRED_TOKEN` | 401 | No |
+| `INACTIVE_MEMBERSHIP` | 403 | No |
+| `FORBIDDEN_ROLE` | 403 | No |
+| `FORBIDDEN_PRODUCT` | 403 | No |
+| `FORBIDDEN_FEATURE` | 403 | No |
+| `INVALID_COOKIE` | 401 | No |
+| `REFRESH_REJECTED` | 401 | No |
+| `REVOCATION_UNCONFIRMED` | 503 | Yes |
+| `INVALID_RESPONSE` | 502 | No |
+| `UPSTREAM_UNAVAILABLE` | 503 | Yes |
+| `INTERNAL_FAILURE` | 500 | No |
 
-## JWT Claims
+Internal exception messages, stacks, credentials, claims, key material, RPC details, upstream bodies, PII, full URLs, IP addresses, and user agents are never copied to public errors. A configured correlation provider must return 1–128 characters matching `[A-Za-z0-9][A-Za-z0-9._:-]*`; invalid or throwing providers fail closed.
 
-The SSO worker signs JWTs with these claims:
+## Security model
 
-| Claim | Type | Description |
-|-------|------|-------------|
-| `sub` | `string` | User ID |
-| `email` | `string` | User email |
-| `org_id` | `string` | Active organization ID |
-| `roles` | `string[]` | Roles in active org |
-| `products` | `string[]` | Product access codes |
-| `membership_status` | `MembershipStatus` | Membership state |
-| `is_email_verified` | `boolean` | Email verification status |
-| `iss` | `"sso-api"` | Issuer |
-| `aud` | `"sso-client"` | Audience |
+- SSO Worker remains the key and credential authority through a private service binding.
+- Auth Core instances hold verifier state privately and never share mutable global configuration.
+- Browser UX state is not authorization evidence.
+- Protected handlers receive only verified immutable context.
+- There is no package-root token getter, extractor, standalone verifier, direct refresh/logout/session validation, cache reset, legacy access-cookie fallback, or credential response header.
 
-All claims are validated with strict type checking in `verifyJWT`.
+### Refresh cookie policy
 
-## Error Responses
+Auth Core's private Cookie Codec accepts only the application-origin host-only cookie `__Host-rm-refresh`. It validates one exact cookie occurrence without decoding the opaque value and returns typed missing/invalid outcomes so browser-route mediation can stop before private SSO RPC. Malformed fields, invalid cookie octets, duplicate or prefix-conflicting names, and values over the fixed cookie size bound fail closed.
 
-| Status | Error | When |
-|--------|-------|------|
-| `401` | `Invalid token` | JWT tampered, wrong issuer/audience |
-| `401` | `Unauthorized: no valid token or refresh token` | No JWT and no refresh cookie |
-| `403` | `Inactive membership` | `membership_status` is not `"active"` |
-| `403` | `Forbidden: insufficient role` | Missing required role |
-| `403` | `Forbidden: product access denied` | Missing product access |
-| `500` | `Refreshed token is invalid` | SSO returned a bad JWT |
-| `502` | `Token refresh failed` | SSO unreachable |
+Creation and clearing use one immutable policy: `Secure; HttpOnly; Path=/; SameSite=Strict`, with no `Domain`. Creation caps `Max-Age` to the shorter configured bound and authoritative SSO session lifetime. Clearing preserves the same identity and attributes and adds `Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`. Parent-domain sharing, `SameSite=None`, and third-party-cookie delivery are not configurable. Browser consumers never read, parse, copy, or apply `Set-Cookie`; the user agent applies it.
 
-## Build
+## Development
 
 ```bash
+npm run test:run
 npm run build
 ```
 
-## Re-initialization
-
-Safe to call `initAuth()` multiple times — clears all caches. Useful for testing or multi-tenant setups:
-
-```ts
-initAuth({ ssoDomain: "https://staging-sso.workers.dev" });
-// Later...
-initAuth({ ssoDomain: "https://prod-sso.workers.dev" });
-```
-
-Register cleanup callbacks:
-
-```ts
-import { onConfigReset } from "@rareminds-eym/auth-core";
-
-const unsub = onConfigReset(() => {
-  // Clear your own caches when initAuth is called again
-});
-unsub(); // unsubscribe when done
-```
-
-## Typed Context
-
-`ContextWithUser` is generic — pass your Cloudflare env bindings:
-
-```ts
-import type { AuthenticatedContext } from "@rareminds-eym/auth-core";
-
-interface MyEnv {
-  DB: D1Database;
-  KV: KVNamespace;
-}
-
-export const onRequestGet = withAuth(async (context: AuthenticatedContext<MyEnv>) => {
-  const db = context.env.DB;
-  const user = context.data.user; // AuthUser — guaranteed present
-  return Response.json({ ok: true });
-});
-```
-
-## Project Structure
-
-```
-auth-core/
-├── src/
-│   ├── index.ts                   # Barrel exports
-│   ├── config.ts                  # initAuth, getConfig, onConfigReset
-│   ├── types/auth.ts              # AuthUser, MembershipStatus, Context types
-│   ├── jwt/verifyJWT.ts           # JWKS-based JWT verification + claim validation
-│   ├── middleware/
-│   │   ├── withAuth.ts            # Auth middleware (JWT + refresh + cookie forwarding)
-│   │   ├── requireRole.ts         # Role guard
-│   │   ├── requireProduct.ts      # Product guard
-│   │   └── withErrorHandler.ts    # Global error handler
-│   ├── session/
-│   │   ├── refreshAccessToken.ts  # POST /auth/refresh (captures Set-Cookie)
-│   │   ├── validateSession.ts     # GET /auth/me
-│   │   └── logout.ts             # POST /auth/logout (captures Set-Cookie)
-│   └── utils/
-│       ├── extractToken.ts        # Bearer header + access_token cookie fallback
-│       ├── getRefreshToken.ts     # refresh_token cookie (raw, no URI decode)
-│       ├── fetchWithTimeout.ts    # AbortController timeout wrapper
-│       └── jsonError.ts           # JSON error response helper
-├── dist/
-├── package.json
-└── tsconfig.json
-```
-
-## License
-
-UNLICENSED — private package for Rareminds.
+Human review is required for authentication changes before release.

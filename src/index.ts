@@ -1,23 +1,24 @@
-export { getConfig, initAuth, onConfigReset } from "./config.js";
-export type { AuthCoreConfig, ResolvedAuthCoreConfig } from "./config.js";
-
-export { verifyJWT } from "./jwt/verifyJWT.js";
-
-export { requireFeature } from "./middleware/requireFeature.js";
-export { requireProduct } from "./middleware/requireProduct.js";
-export { requireRole } from "./middleware/requireRole.js";
-export { withAuth } from "./middleware/withAuth.js";
-export { withErrorHandler } from "./middleware/withErrorHandler.js";
-
-export { extractToken } from "./utils/extractToken.js";
-export { getRefreshToken } from "./utils/getRefreshToken.js";
-export { jsonError } from "./utils/jsonError.js";
-
-export { logout } from "./session/logout.js";
-export { refreshAccessToken } from "./session/refreshAccessToken.js";
-export { validateSession } from "./session/validateSession.js";
+/**
+ * Creates an isolated trusted-runtime authentication facade.
+ *
+ * Each call captures immutable verifier-affecting configuration, so instances
+ * cannot share issuer, audience, algorithm, or service-binding state.
+ */
+export { createAuth } from "./createAuth.js";
 
 export type {
-  AuthUser, AuthenticatedContext, ContextWithUser, MembershipStatus, SessionValidationResponse
-} from "./types/auth.js";
+  Auth,
+  AuthCoreConfig,
+  AuthCoreErrorCode,
+  AuthCoreErrorDescriptor, AuthCounterName,
+  AuthHistogramName, AuthObservation,
+  AuthObservationEventName,
+  AuthObservationOutcome,
+  AuthObservationReason, AuthenticatedContext, AuthenticatedHandler, ContextWithUser, FeatureCheck,
+  MembershipStatus,
+  RequestHandler,
+  VerifiedAuthContext,
+  VerifiedAuthUser,
+  VerifiedAuthUser as AuthUser,
+} from "./types/public.js";
 

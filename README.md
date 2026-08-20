@@ -21,9 +21,6 @@ tests/
 ├── unit/
 ├── property/
 └── integration/
-
-negative/
-└── legacy-imports.ts
 ```
 
 ### Conventions
@@ -36,7 +33,7 @@ negative/
 * Internal modules are organized by capability, such as `authentication`, `browser`, and `telemetry`.
 * Avoid generic folders such as `utils`, `helpers`, `common`, or `misc`.
 * Internal modules must not be exposed as public package subpaths.
-* Production code must not depend on test or negative-test files.
+* Production code must not depend on test files.
 * NodeNext ESM imports use explicit `.js` extensions.
 * Observability, correlation, errors, and configuration should remain separate modules rather than being inlined into the factory.
 * Each call to `createAuth()` should create an isolated instance without shared mutable global state.

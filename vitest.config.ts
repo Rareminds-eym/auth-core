@@ -6,7 +6,7 @@ export default defineConfig({
         environment: "node",
         watch: false,
         passWithNoTests: false,
-        exclude: ["**/node_modules/**", "**/auth-core/**"],
+        exclude: ["**/node_modules/**", "**/dist/**"],
         isolate: true,
         fileParallelism: false,
         maxWorkers: 1,
@@ -19,10 +19,10 @@ export default defineConfig({
             provider: "istanbul",
             reporter: ["text", "json-summary"],
             include: [
-                "src/internal/verifier.ts",
-                "src/internal/jwks-key-store.ts",
-                "src/internal/bearer.ts",
-                "src/internal/browser-route-guard.ts",
+                "src/internal/authentication/verifier.ts",
+                "src/internal/authentication/jwks-key-store.ts",
+                "src/internal/authentication/bearer.ts",
+                "src/internal/browser/browser-route-guard.ts",
             ],
             thresholds: {
                 statements: 100,

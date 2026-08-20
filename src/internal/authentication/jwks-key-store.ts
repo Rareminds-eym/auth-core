@@ -1,9 +1,9 @@
 import { createLocalJWKSet, importJWK } from "jose";
-import type { SsoJwksKey, SsoJwksSnapshot } from "../types/public.js";
-import type { ResolvedAuthCoreConfig } from "./config.js";
-import { isValidCorrelationId } from "./correlation.js";
-import { CoreFailure } from "./errors.js";
-import { SafeObserver } from "./observability.js";
+import type { SsoJwksKey, SsoJwksSnapshot } from "../../types/public.js";
+import type { ResolvedAuthCoreConfig } from "../config.js";
+import { isValidCorrelationId } from "../telemetry/correlation.js";
+import { CoreFailure } from "../errors.js";
+import { SafeObserver } from "../telemetry/observability.js";
 
 const KEY_FIELDS = new Set(["alg", "e", "kid", "kty", "n", "status", "use"]);
 // freshnessSeconds is optional in SsoJwksSnapshot — only required fields are validated.
@@ -55,10 +55,13 @@ function isPlainRecord(value: object): boolean {
  */
 function hasDataProperties(value: object, required: ReadonlySet<string>): boolean {
     const descriptors = Object.getOwnPropertyDescriptors(value);
-    return [...required].every((field) => {
-        const descriptor = descriptors[field];
-        return descriptor !== undefined && descriptor.get === undefined && descriptor.set === undefined;
-    });
+    for (const key of Object.keys(descriptors)) {
+        const descriptor = descriptors[key];
+        if (descriptor.get !== undefined || descriptor.set !== undefined) {
+            return false;
+        }
+    }
+    return [...required].every((field) => descriptors[field] !== undefined);
 }
 
 function isDenseArray(value: unknown): value is readonly unknown[] {

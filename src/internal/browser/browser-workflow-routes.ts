@@ -1,12 +1,12 @@
 import type {
     AuthCoreErrorCode,
-} from "../types/public.js";
-import { CoreFailure, errorResponse } from "./errors.js";
-import { CookieCodec } from "./cookieCodec.js";
+} from "../../types/public.js";
+import { CoreFailure, errorResponse } from "../errors.js";
+import { CookieCodec } from "./cookie-codec.js";
 import { BrowserAuthRoute } from "./browser-route-guard.js";
-import { ResolvedAuthCoreConfig } from "./config.js";
-import { SafeObserver } from "./observability.js";
-import { correlationIdFor } from "./correlation.js";
+import { ResolvedAuthCoreConfig } from "../config.js";
+import { SafeObserver } from "../telemetry/observability.js";
+import { correlationIdFor } from "../telemetry/correlation.js";
 
 /** Exact headers the SDK-private client requires on every JSON response (wireDecoder.ts). */
 const JSON_RESPONSE_HEADERS = Object.freeze({

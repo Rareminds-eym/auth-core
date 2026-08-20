@@ -1,11 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { retainedPropertyParameters } from "../../../tools/auth-test-infrastructure/pbt.mjs";
-import { createWorkflowRouteHandler } from "./browser-workflow-routes.js";
-import { createCookieCodec } from "./cookieCodec.js";
-import { resolveConfig } from "./config.js";
-import { SafeObserver } from "./observability.js";
-import type { AuthCoreConfig } from "../types/public.js";
+import { createWorkflowRouteHandler } from "../../src/internal/browser/browser-workflow-routes.js";
+import { createCookieCodec } from "../../src/internal/browser/cookie-codec.js";
+import { resolveConfig } from "../../src/internal/config.js";
+import { SafeObserver } from "../../src/internal/telemetry/observability.js";
+import type { AuthCoreConfig } from "../../src/types/public.js";
 
 const FEATURE_PROPERTY_LABEL = "Feature: auth-sdk-token-hardening, Property 16: Authentication and privilege changes replace prior credentials before publication";
 

@@ -1,12 +1,12 @@
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
-import { createAuth } from "../index.js";
+import { createAuth } from "../../src/index.js";
 import type {
     AuthCoreConfig,
     SsoJwksKey,
     SsoServiceBinding,
     VerifiedAuthContext,
-} from "../types/public.js";
+} from "../../src/types/public.js";
 
 const issuer = "https://authorization.issuer.example";
 const audience = "authorization-resource";

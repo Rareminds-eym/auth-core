@@ -2,9 +2,9 @@ import fc from "fast-check";
 import { exportJWK, generateKeyPair } from "jose";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { retainedPropertyParameters } from "../../../tools/auth-test-infrastructure/pbt.mjs";
-import { JwksKeyStore } from "./jwks-key-store.js";
-import type { SsoJwksKey } from "../types/public.js";
-import { resolveConfig } from "./config.js";
+import { JwksKeyStore } from "../../src/internal/authentication/jwks-key-store.js";
+import type { SsoJwksKey } from "../../src/types/public.js";
+import { resolveConfig } from "../../src/internal/config.js";
 
 const kidPool = ["key-0", "key-1", "key-2", "key-3", "key-4", "key-5"];
 let realKeys: SsoJwksKey[] = [];

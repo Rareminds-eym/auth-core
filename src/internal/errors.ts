@@ -1,5 +1,5 @@
 import type { AuthCoreErrorCode, AuthCoreErrorDescriptor } from "../types/public.js";
-import { isValidCorrelationId } from "./correlation-format.js";
+import { isValidCorrelationId } from "./telemetry/correlation-format.js";
 
 interface ErrorDefinition {
     readonly status: number;

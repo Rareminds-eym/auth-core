@@ -1,10 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
-import { createCookieCodec } from "./cookieCodec.js";
-import { SafeObserver } from "./observability.js";
-import { BrowserAuthRoute } from "./browser-route-guard.js";
+import { createCookieCodec } from "../../src/internal/browser/cookie-codec.js";
+import { SafeObserver } from "../../src/internal/telemetry/observability.js";
+import { BrowserAuthRoute } from "../../src/internal/browser/browser-route-guard.js";
 import { retainedPropertyParameters } from "../../../tools/auth-test-infrastructure/pbt.mjs";
-import { createWorkflowRouteHandler } from "./browser-workflow-routes.js";
+import { createWorkflowRouteHandler } from "../../src/internal/browser/browser-workflow-routes.js";
 
 const legacyCredentialArbitrary = fc.record({
     authorization: fc.option(fc.string(), { nil: undefined }),

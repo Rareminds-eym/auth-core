@@ -1,9 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { retainedPropertyParameters } from "../../../tools/auth-test-infrastructure/pbt.mjs";
-import { dispatchBrowserAuthRequest } from "./browser-route-guard.js";
-import { resolveConfig } from "./config.js";
-import type { AuthCoreConfig } from "../types/public.js";
+import { dispatchBrowserAuthRequest } from "../../src/internal/browser/browser-route-guard.js";
+import { resolveConfig } from "../../src/internal/config.js";
+import type { AuthCoreConfig } from "../../src/types/public.js";
 
 const FEATURE_PROPERTY_LABEL = "Feature: auth-sdk-token-hardening, Property 15: Browser auth route validation is exact and deny-first";
 

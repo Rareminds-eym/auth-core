@@ -6,7 +6,7 @@ import type {
     AuthObservationEventName,
     AuthObservationOutcome,
     AuthObservationReason
-} from "../types/public.js";
+} from "../../types/public.js";
 import { isValidCorrelationId } from "./correlation-format.js";
 
 export type ObservationMode = "production" | "debug";

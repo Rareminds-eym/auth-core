@@ -4,7 +4,7 @@ import { retainedPropertyParameters } from "../../../tools/auth-test-infrastruct
 import {
     createCookieCodec,
     MAX_REFRESH_COOKIE_VALUE_BYTES,
-} from "./cookieCodec.js";
+} from "../../src/internal/browser/cookie-codec.js";
 
 const FEATURE_PROPERTY_LABEL =
     "Feature: auth-sdk-token-hardening, Property 12: Cookie codec round trips and clears symmetrically";

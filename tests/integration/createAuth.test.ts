@@ -4,15 +4,15 @@ import {
     generateKeyPair
 } from "jose";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import * as packageRoot from "../index.js";
-import { createAuth } from "../index.js";
-import { ERROR_DEFINITIONS, describeError } from "../internal/errors.js";
+import * as packageRoot from "../../src/index.js";
+import { createAuth } from "../../src/index.js";
+import { ERROR_DEFINITIONS, describeError } from "../../src/internal/errors.js";
 import type {
     AuthCoreConfig,
     SsoJwksKey,
     SsoServiceBinding,
     VerifiedAuthContext
-} from "../types/public.js";
+} from "../../src/types/public.js";
 
 interface SigningFixture {
     readonly privateKey: CryptoKey;

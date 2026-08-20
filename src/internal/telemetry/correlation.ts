@@ -1,6 +1,6 @@
-import type { ResolvedAuthCoreConfig } from "./config.js";
+import type { ResolvedAuthCoreConfig } from "../config.js";
 import { isValidCorrelationId } from "./correlation-format.js";
-import { CoreFailure } from "./errors.js";
+import { CoreFailure } from "../errors.js";
 
 export { isValidCorrelationId } from "./correlation-format.js";
 

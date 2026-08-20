@@ -2,6 +2,59 @@
 
 Trusted-runtime authentication middleware for Rareminds applications. Version 3 is a clean break: consumers use one isolated `createAuth` facade; token extraction, JWT/JWKS implementation, cookies, refresh, logout, and response construction are package-private.
 
+## Architecture
+
+`auth-core` is the server-side authentication package for Cloudflare Workers and other supported server runtimes. It exposes a single public entrypoint while keeping implementation details internal.
+
+```text
+src/
+├── index.ts
+├── createAuth.ts
+├── internal/
+│   ├── authentication/
+│   ├── browser/
+│   └── telemetry/
+└── types/
+    └── public.ts
+
+tests/
+├── unit/
+├── property/
+└── integration/
+
+negative/
+└── legacy-imports.ts
+```
+
+### Conventions
+
+* `src/index.ts` is the only public package entrypoint.
+* `createAuth.ts` is the composition root.
+* Authentication implementation belongs under `src/internal/`.
+* Public types belong under `src/types/public.ts`.
+* Tests are kept outside production source under `tests/`.
+* Internal modules are organized by capability, such as `authentication`, `browser`, and `telemetry`.
+* Avoid generic folders such as `utils`, `helpers`, `common`, or `misc`.
+* Internal modules must not be exposed as public package subpaths.
+* Production code must not depend on test or negative-test files.
+* NodeNext ESM imports use explicit `.js` extensions.
+* Observability, correlation, errors, and configuration should remain separate modules rather than being inlined into the factory.
+* Each call to `createAuth()` should create an isolated instance without shared mutable global state.
+
+The intended dependency direction is:
+
+```text
+index.ts
+   ↓
+createAuth.ts
+   ↓
+authentication / browser / telemetry
+   ↓
+config / context / errors
+```
+
+The public API should remain small and stable, while server-side authentication logic stays internal and independently testable.
+
 ## Runtime support
 
 - Node.js 18 or newer

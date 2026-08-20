@@ -2,14 +2,14 @@ import fc from "fast-check";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
 import { retainedPropertyParameters } from "../../../tools/auth-test-infrastructure/pbt.mjs";
-import { createAuth } from "../index.js";
+import { createAuth } from "../../src/index.js";
 import type {
     AuthCoreConfig,
     MembershipStatus,
     SsoJwksKey,
     SsoServiceBinding,
     VerifiedAuthContext,
-} from "../types/public.js";
+} from "../../src/types/public.js";
 
 const issuer = "https://property-22.issuer.example";
 const audience = "property-22-resource";

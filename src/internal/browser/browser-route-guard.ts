@@ -1,5 +1,5 @@
-import type { ResolvedAuthCoreConfig } from "./config.js";
-import { errorResponse } from "./errors.js";
+import type { ResolvedAuthCoreConfig } from "../config.js";
+import { errorResponse } from "../errors.js";
 
 const ROUTE_SUFFIXES = Object.freeze([
     "/login",

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAuth } from "../index.js";
-import type { AuthCoreConfig, SsoServiceBinding, VerifiedAuthUser } from "../types/public.js";
-import { resolveConfig } from "./config.js";
-import { createVerifiedContext } from "./context.js";
+import { createAuth } from "../../src/index.js";
+import type { AuthCoreConfig, SsoServiceBinding, VerifiedAuthUser } from "../../src/types/public.js";
+import { resolveConfig } from "../../src/internal/config.js";
+import { createVerifiedContext } from "../../src/internal/context.js";
 
 function validConfig(sso: SsoServiceBinding = {
     getJwks: vi.fn(async ({ correlationId }) => ({

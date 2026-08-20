@@ -5,10 +5,10 @@ import type {
     SsoJwksKey,
     SsoJwksRpcOutcome,
     SsoServiceBinding,
-} from "../types/public.js";
-import { resolveConfig } from "./config.js";
-import { CoreFailure } from "./errors.js";
-import { JwksKeyStore, jwksFailureReason } from "./jwks-key-store.js";
+} from "../../../src/types/public.js";
+import { resolveConfig } from "../../../src/internal/config.js";
+import { CoreFailure } from "../../../src/internal/errors.js";
+import { JwksKeyStore, jwksFailureReason } from "../../../src/internal/authentication/jwks-key-store.js";
 
 vi.mock("jose", async (importOriginal) => {
     const original = await importOriginal<typeof import("jose")>();

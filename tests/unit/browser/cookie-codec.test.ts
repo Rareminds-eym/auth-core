@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     createCookieCodec,
     MAX_REFRESH_COOKIE_VALUE_BYTES,
-} from "./cookieCodec.js";
+} from "../../../src/internal/browser/cookie-codec.js";
 
 const codec = createCookieCodec(3600);
 const maxLengthValue = new Array(MAX_REFRESH_COOKIE_VALUE_BYTES + 1).join("a");

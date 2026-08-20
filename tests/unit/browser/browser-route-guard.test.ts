@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthCoreConfig } from "../types/public.js";
+import type { AuthCoreConfig } from "../../../src/types/public.js";
 import {
     dispatchBrowserAuthRequest,
     headerValue,
@@ -7,8 +7,8 @@ import {
     matchRoute,
     validApprovedOrigin,
     validateBrowserAuthRequest,
-} from "./browser-route-guard.js";
-import { resolveConfig } from "./config.js";
+} from "../../../src/internal/browser/browser-route-guard.js";
+import { resolveConfig } from "../../../src/internal/config.js";
 
 const ROUTES = [
     "/login",

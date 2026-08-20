@@ -7,13 +7,13 @@ import {
     type JWTPayload,
 } from "jose";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { createAuth } from "../index.js";
+import { createAuth } from "../../../src/index.js";
 import type {
     AuthCoreConfig,
     SsoJwksKey,
     SsoServiceBinding,
     VerifiedAuthContext,
-} from "../types/public.js";
+} from "../../../src/types/public.js";
 
 interface SigningFixture {
     readonly privateKey: CryptoKey;

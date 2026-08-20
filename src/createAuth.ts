@@ -1,12 +1,12 @@
-import { extractBearer } from "./internal/bearer.js";
-import { dispatchBrowserAuthRequest } from "./internal/browser-route-guard.js";
+import { extractBearer } from "./internal/authentication/bearer.js";
+import { dispatchBrowserAuthRequest } from "./internal/browser/browser-route-guard.js";
 import { resolveConfig } from "./internal/config.js";
-import { correlationIdFor } from "./internal/correlation.js";
+import { correlationIdFor } from "./internal/telemetry/correlation.js";
 import { classifyFailure, CoreFailure, errorResponse } from "./internal/errors.js";
-import { SafeObserver } from "./internal/observability.js";
-import { createVerifier } from "./internal/verifier.js";
-import { createCookieCodec } from "./internal/cookieCodec.js";
-import { createWorkflowRouteHandler } from "./internal/browser-workflow-routes.js";
+import { SafeObserver } from "./internal/telemetry/observability.js";
+import { createVerifier } from "./internal/authentication/verifier.js";
+import { createCookieCodec } from "./internal/browser/cookie-codec.js";
+import { createWorkflowRouteHandler } from "./internal/browser/browser-workflow-routes.js";
 import type {
     Auth,
     AuthCoreConfig,

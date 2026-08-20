@@ -1,14 +1,14 @@
 import fc from "fast-check";
 import { base64url, exportJWK, generateKeyPair } from "jose";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { createAuth } from "../index.js";
+import { createAuth } from "../../src/index.js";
 import type {
     AuthCoreConfig,
     MembershipStatus,
     SsoJwksKey,
     SsoServiceBinding,
     VerifiedAuthContext,
-} from "../types/public.js";
+} from "../../src/types/public.js";
 
 type AlgorithmCase = "RS256" | "PS256" | "HS256" | "none";
 type KeyCase = "trusted" | "attacker";

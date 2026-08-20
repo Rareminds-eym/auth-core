@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAuth } from "../index.js";
-import type { AuthCoreConfig, AuthObservation } from "../types/public.js";
-import { SafeObserver } from "./observability.js";
+import { createAuth } from "../../../src/index.js";
+import type { AuthCoreConfig, AuthObservation } from "../../../src/types/public.js";
+import { SafeObserver } from "../../../src/internal/telemetry/observability.js";
 
 function config(observer?: (event: AuthObservation) => void): AuthCoreConfig {
     return {

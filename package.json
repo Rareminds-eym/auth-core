@@ -28,7 +28,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:property": "vitest run src/internal/*.property.test.ts",
+    "test:property": "vitest run tests/property/*.property.test.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

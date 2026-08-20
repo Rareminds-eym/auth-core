@@ -1,11 +1,11 @@
 import type { JWSHeaderParameters, JWTPayload } from "jose";
 import { decodeProtectedHeader, errors, jwtVerify } from "jose";
-import type { MembershipStatus, VerifiedAuthUser } from "../types/public.js";
-import type { ResolvedAuthCoreConfig } from "./config.js";
-import { createVerifiedContext } from "./context.js";
-import { CoreFailure } from "./errors.js";
+import type { MembershipStatus, VerifiedAuthUser } from "../../types/public.js";
+import type { ResolvedAuthCoreConfig } from "../config.js";
+import { createVerifiedContext } from "../context.js";
+import { CoreFailure } from "../errors.js";
 import { JwksKeyStore } from "./jwks-key-store.js";
-import type { SafeObserver } from "./observability.js";
+import type { SafeObserver } from "../telemetry/observability.js";
 
 const CLOCK_TOLERANCE_SECONDS = 30;
 const REQUIRED_CLAIMS = Object.freeze([
